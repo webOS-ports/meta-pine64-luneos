@@ -1,0 +1,10 @@
+[Unit]
+Description=Load touchscreen driver
+Before=luna-next.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/touchscreen-initialize.sh
+
+[Install]
+WantedBy=luna-next.service
