@@ -56,22 +56,23 @@ umount_proc_sys_dev_configfs() {
 }
 
 start_mdev() {
-	echo /sbin/mdev > /proc/sys/kernel/hotplug
+    echo /sbin/mdev > /sys/kernel/uevent_helper
 	mdev -s
 }
 
 stop_mdev() {
 	killall mdev
-	echo "" > /proc/sys/kernel/hotplug
+    echo "" > /sys/kernel/uevent_helper
 }
 
+# $1: IP address to listen to
 start_telnetd() {
 	# /dev/pts (needed for telnet)
 	mkdir /dev/pts
 	mount -t devpts none /dev/pts
 	
 	echo "Starting telnetd..."
-	/usr/sbin/telnetd
+	/usr/sbin/telnetd -b $1
 	echo "Pidof telnetd: $(pidof telnetd)"
 }
 

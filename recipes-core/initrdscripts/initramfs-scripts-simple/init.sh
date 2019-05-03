@@ -15,13 +15,14 @@ mount_proc_sys_dev_configfs ""
 start_mdev
 # redirect log
 setup_log
-# start telnetd
-start_telnetd
 
 setup_usb_network 172.16.42.2/16
 
+# start telnetd for this IP
+start_telnetd 172.16.42.2
+
 # mount partition labeled "luneos-rootfs"
-mount_root_partition "mmcblk0p2" "/rfs"
+mount_root_partition "luneos-rootfs" "/rfs"
 
 mount_proc_sys_dev_configfs "/rfs"
 
