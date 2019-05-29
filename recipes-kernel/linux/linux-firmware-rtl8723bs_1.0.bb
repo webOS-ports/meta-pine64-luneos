@@ -4,6 +4,8 @@ LIC_FILES_CHKSUM = "file://README.md;md5=779f37dae32d47374b491836b4c5d94d"
 
 COMPATIBLE_MACHINE = "pinephone"
 
+RDEPENDS_${PN} = "wireless-regdb"
+
 SRCREV = "cc77e7b6092c54500058cd027b679421b9399905"
 SRC_URI = " \
     git://github.com/hadess/rtl8723bs.git;branch=master \
