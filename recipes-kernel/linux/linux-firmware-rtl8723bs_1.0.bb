@@ -13,6 +13,9 @@ SRC_URI = " \
 
 S = "${WORKDIR}/git"
 
+do_configure() {
+}
+
 do_compile() {
 }
 
