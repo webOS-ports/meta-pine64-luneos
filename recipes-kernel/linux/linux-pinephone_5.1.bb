@@ -15,6 +15,7 @@ BRANCH = "pinephone-dontbeevil-5.1-rc7"
 SRCREV = "bc1984d747095d285236f0d20f691e421f3bbfc3"
 SRC_URI = " \
           git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
+	  file://0001-dts-touchscreen-fix.patch \
 	  file://defconfig \
 	  file://extra.cfg \
 	  "
