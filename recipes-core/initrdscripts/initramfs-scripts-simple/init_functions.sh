@@ -122,6 +122,7 @@ setup_usb_network_configfs() {
 	#mkdir $CONFIGFS/g1/functions/ffs.adb
 	#mkdir $CONFIGFS/g1/functions/ffs.mtp
 	mkdir $CONFIGFS/g1/functions/ecm.usb0
+	echo "FA:75:7F:BB:F4:E6" > $CONFIGFS/g1/functions/ecm.usb0/host_addr
 
 	# Create configuration instance
 	mkdir $CONFIGFS/g1/configs/c.1
