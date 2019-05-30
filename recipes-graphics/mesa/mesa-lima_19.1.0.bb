@@ -1,7 +1,7 @@
 require mesa-lima-meson.inc
 
 BRANCH = "master"
-SRCREV = "de0c97c8171f8a8183b94d8ac6997117c4671da8"
+SRCREV = "da26013eb7a216eea98b71ba6e8341a47834e3ec"
 SRC_URI = "git://gitlab.freedesktop.org/mesa/mesa.git;branch=${BRANCH}"
 
 S = "${WORKDIR}/git"
