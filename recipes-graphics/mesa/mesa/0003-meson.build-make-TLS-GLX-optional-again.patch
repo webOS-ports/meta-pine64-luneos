@@ -1,0 +1,44 @@
+From d37bfd0760a435e83094510639515dad91bf25f9 Mon Sep 17 00:00:00 2001
+From: Alexander Kanavin <alex.kanavin@gmail.com>
+Date: Wed, 15 May 2019 17:21:51 +0200
+Subject: [PATCH] meson.build: make TLS GLX optional again
+
+This was optional with autotools, and needs to be disabled
+when using musl C library, for instance.
+
+Upstream-Status: Pending
+Signed-off-by: Alexander Kanavin <alex.kanavin@gmail.com>
+---
+ meson.build       | 4 +++-
+ meson_options.txt | 6 ++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/meson.build b/meson.build
+index ca59a07c7ec..2646d20754c 100644
+--- a/meson.build
++++ b/meson.build
+@@ -362,7 +362,9 @@ if with_egl and not (with_platform_drm or with_platform_surfaceless)
+   endif
+ endif
+ 
+-pre_args += '-DGLX_USE_TLS'
++if get_option('glx-tls')
++  pre_args += '-DGLX_USE_TLS'
++endif
+ if with_glx != 'disabled'
+   if not (with_platform_x11 and with_any_opengl)
+     error('Cannot build GLX support without X11 platform support and at least one OpenGL API')
+diff --git a/meson_options.txt b/meson_options.txt
+index dd9339d5bfa..8c328a88b52 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -370,3 +370,9 @@ option(
+   value : 25,
+   description : 'Android Platform SDK version. Default: Nougat version.'
+ )
++option(
++  'glx-tls',
++  type : 'boolean',
++  value : true,
++  description : 'Enable TLS support in GLX',
++)

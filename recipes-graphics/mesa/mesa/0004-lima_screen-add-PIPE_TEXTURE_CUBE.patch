@@ -1,4 +1,4 @@
-From 1e80f5b36867fa9ae00e6e29b8e52b201140682a Mon Sep 17 00:00:00 2001
+From dd0950aa1f22cc7a478e964e7b35de1c93045e55 Mon Sep 17 00:00:00 2001
 From: Christophe Chapuis <chris.chapuis@gmail.com>
 Date: Sat, 18 May 2019 08:33:53 +0000
 Subject: [PATCH] lima_screen: add PIPE_TEXTURE_CUBE
@@ -9,10 +9,10 @@ Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/src/gallium/drivers/lima/lima_screen.c b/src/gallium/drivers/lima/lima_screen.c
-index cd9639b41e2..f946ad7ccaa 100644
+index 29dfc16c7ac..bb2bae4c41c 100644
 --- a/src/gallium/drivers/lima/lima_screen.c
 +++ b/src/gallium/drivers/lima/lima_screen.c
-@@ -254,6 +254,7 @@ lima_screen_is_format_supported(struct pipe_screen *pscreen,
+@@ -257,6 +257,7 @@ lima_screen_is_format_supported(struct pipe_screen *pscreen,
     case PIPE_BUFFER:
     case PIPE_TEXTURE_1D:
     case PIPE_TEXTURE_2D:
@@ -20,6 +20,3 @@ index cd9639b41e2..f946ad7ccaa 100644
        break;
     default:
        return FALSE;
--- 
-2.17.0
-
