@@ -11,12 +11,13 @@ LINUX_VERSION_EXTENSION = "-pinephone"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 
-BRANCH = "pinephone-dontbeevil-5.1-rc7"
-SRCREV = "bc1984d747095d285236f0d20f691e421f3bbfc3"
+KBUILD_DEFCONFIG_pinephone = "pinephone_defconfig"
+
+BRANCH = "pinephone-dontbeevil-luneos"
+SRCREV = "a580691a74710adcc586b80ad121b107a6fb2cf3"
 SRC_URI = " \
-          git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
-	  file://0001-dts-touchscreen-fix.patch \
-	  file://defconfig \
+          git://gitlab.com/Tofe/linux.git;protocol=https;branch=${BRANCH} \
+	  file://cleanup.cfg \
 	  file://extra.cfg \
 	  "
 
