@@ -1,6 +1,6 @@
-From b8f4831f45252191aa303d9e0d4171db739f68d0 Mon Sep 17 00:00:00 2001
+From bf1caaea8e39a5c4e4caa6cea15e3913ca662055 Mon Sep 17 00:00:00 2001
 From: Christophe Chapuis <chris.chapuis@gmail.com>
-Date: Wed, 29 May 2019 10:34:09 +0000
+Date: Sun, 11 Aug 2019 08:43:29 +0000
 Subject: [PATCH] arm64: dts: dontbeevil: remove pull-up bias on touch_intr_pin
 
 Currently some touch "release" events are not sent by the kernel.
@@ -12,18 +12,18 @@ Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
  1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-dontbeevil.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-dontbeevil.dts
-index 24c32821572f..98d7fd13b583 100644
+index 09f39d1d3ab3..587babcfa8b9 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-dontbeevil.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-dontbeevil.dts
-@@ -259,8 +259,6 @@
+@@ -286,8 +286,6 @@
  &pio {
-        touch_intr_pin: touch_intr_pin {
-                pins = "PH4";
--               // TODO: perhaps remove this bias
--               bias-pull-up;
-                function = "irq";
-        };
+ 	touch_intr_pin: touch_intr_pin {
+ 		pins = "PH4";
+-		// TODO: perhaps remove this bias
+-		bias-pull-up;
+ 		function = "irq";
+ 	};
  };
 -- 
-2.21.0
+2.17.0
 
