@@ -1,0 +1,13 @@
+diff --git a/dispatch/glproc_egl.cpp b/dispatch/glproc_egl.cpp
+index c133127..2628ba6 100644
+--- a/dispatch/glproc_egl.cpp
++++ b/dispatch/glproc_egl.cpp
+@@ -70,7 +70,7 @@ void *_libGlHandle = NULL;
+ void *
+ _getPublicProcAddress(const char *procName)
+ {
+-#if defined(ANDROID)
++#if defined(ANDROID) || 1
+     /*
+      * Android does not support LD_PRELOAD.  It is assumed that applications
+      * are explicitely loading egltrace.so.

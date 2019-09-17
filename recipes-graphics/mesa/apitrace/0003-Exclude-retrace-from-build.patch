@@ -1,0 +1,28 @@
+From 4fa95896f5dd5aec350128f4f66ec5aaf6c63cef Mon Sep 17 00:00:00 2001
+From: Christophe Chapuis <chris.chapuis@gmail.com>
+Date: Tue, 17 Sep 2019 18:13:42 +0000
+Subject: [PATCH] Exclude retrace from build
+
+Retrace isn't useful on embedded device
+
+Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9154e1b0..9a18325b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -575,7 +575,7 @@ add_subdirectory (lib)
+ add_subdirectory (dispatch)
+ add_subdirectory (helpers)
+ add_subdirectory (wrappers)
+-add_subdirectory (retrace)
++#add_subdirectory (retrace)
+ 
+ 
+ ##############################################################################
+-- 
+2.17.0
+

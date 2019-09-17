@@ -1,0 +1,53 @@
+From 8ce520c6c935551ef13e045981b18c985e86c1f6 Mon Sep 17 00:00:00 2001
+From: Christophe Chapuis <chris.chapuis@gmail.com>
+Date: Tue, 17 Sep 2019 18:34:18 +0000
+Subject: [PATCH] Fix APIs conflicting definitions
+
+---
+ specs/eglapi.py | 5 ++++-
+ specs/glapi.py  | 6 +++---
+ 2 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/specs/eglapi.py b/specs/eglapi.py
+index f0853e0e..b4c23640 100644
+--- a/specs/eglapi.py
++++ b/specs/eglapi.py
+@@ -211,6 +211,9 @@ EGLPlatformDisplayAttribsEXT = EGLIntArray([
+ 
+ EGLProc = Opaque("__eglMustCastToProperFunctionPointerType")
+ 
++# EGLuint64CHROMIUM
++EGLuint64CHROMIUM = Alias("EGLuint64CHROMIUM", UInt64)
++
+ def GlFunction(*args, **kwargs):
+     kwargs.setdefault('call', 'EGLAPIENTRY')
+     return Function(*args, **kwargs)
+@@ -274,7 +277,7 @@ eglapi.addFunctions([
+     GlFunction(EGLBoolean, "eglQuerySurfacePointerANGLE", [(EGLDisplay, "dpy"), (EGLSurface, "surface"), (EGLint_enum, "attribute"), Out(Pointer(OpaquePointer(Void)), "value")], sideeffects=False),
+ 
+     # EGL_CHROMIUM_get_sync_values
+-    GlFunction(Bool, "eglGetSyncValuesCHROMIUM", [(EGLDisplay, "dpy"), (EGLSurface, "surface"), Out(Pointer(Int64), "ust"), Out(Pointer(Int64), "msc"), Out(Pointer(Int64), "sbc")], sideeffects=False),
++    GlFunction(EGLBoolean, "eglGetSyncValuesCHROMIUM", [(EGLDisplay, "dpy"), (EGLSurface, "surface"), Out(Pointer(EGLuint64CHROMIUM), "ust"), Out(Pointer(EGLuint64CHROMIUM), "msc"), Out(Pointer(EGLuint64CHROMIUM), "sbc")], sideeffects=False),
+ 
+     # EGL_EXT_platform_base
+     GlFunction(EGLDisplay, "eglGetPlatformDisplayEXT", [(EGLenum, "platform"), (OpaquePointer(Void), "native_display"), (EGLPlatformDisplayAttribsEXT, "attrib_list")]),
+diff --git a/specs/glapi.py b/specs/glapi.py
+index d50bb6a7..74fcfcb4 100644
+--- a/specs/glapi.py
++++ b/specs/glapi.py
+@@ -1286,9 +1286,9 @@ glapi.addFunctions([
+     GlFunction(Void, "glProgramUniform3ui64vARB", [(GLprogram, "program"), (GLlocation, "location"), (GLsizei, "count"), (Array(Const(GLuint64), "count*3"), "value")]),
+     GlFunction(Void, "glProgramUniform4ui64vARB", [(GLprogram, "program"), (GLlocation, "location"), (GLsizei, "count"), (Array(Const(GLuint64), "count*4"), "value")]),
+ 
+-    # GL_ARB_indirect_parameters
+-    GlFunction(Void, "glMultiDrawArraysIndirectCountARB", [(GLenum_mode, "mode"), (GLintptr, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
+-    GlFunction(Void, "glMultiDrawElementsIndirectCountARB", [(GLenum_mode, "mode"), (GLenum, "type"), (GLintptr, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
++    # GL_ARB_indirect_parameters 
++    GlFunction(Void, "glMultiDrawArraysIndirectCountARB", [(GLenum_mode, "mode"), (GLpointerConst, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
++    GlFunction(Void, "glMultiDrawElementsIndirectCountARB", [(GLenum_mode, "mode"), (GLenum, "type"), (GLpointerConst, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
+ 
+     # GL_ARB_instanced_arrays
+     GlFunction(Void, "glVertexAttribDivisorARB", [(GLuint, "index"), (GLuint, "divisor")]),
+-- 
+2.17.0
+
