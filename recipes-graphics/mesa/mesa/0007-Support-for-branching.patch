@@ -1,10 +1,1817 @@
-From d8bf5152d9a65d60acddea1e9d15633665a5124f Mon Sep 17 00:00:00 2001
+From e762ab5398cfe32cae1ad27e86173f599c5a8474 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Fri, 13 Sep 2019 13:18:29 +0700
+Subject: [PATCH 1/7] lima/gpir: Fix compiler warning
+
+---
+ src/gallium/drivers/lima/ir/gp/nir.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/nir.c b/src/gallium/drivers/lima/ir/gp/nir.c
+index 567d2aa1896..6dcb4d88f02 100644
+--- a/src/gallium/drivers/lima/ir/gp/nir.c
++++ b/src/gallium/drivers/lima/ir/gp/nir.c
+@@ -246,7 +246,7 @@ static bool gpir_emit_load_const(gpir_block *block, nir_instr *ni)
+ {
+    nir_load_const_instr *instr = nir_instr_as_load_const(ni);
+    gpir_const_node *node =
+-      gpir_node_create_ssa(block, gpir_op_const, &instr->def);
++      gpir_node_to_const(gpir_node_create_ssa(block, gpir_op_const, &instr->def));
+    if (unlikely(!node))
+       return false;
+ 
+-- 
+2.22.0
+
+
+From cddd06ae1b34fc597f1fc1f12640d7cb95145f44 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Tue, 10 Sep 2019 21:11:42 +0700
+Subject: [PATCH 2/7] lima/gpir: Only try to place actual children
+
+When picking a node to be scheduled, we try to schedule its children as
+well. But we shouldn't try to schedule nodes which only have a fake
+dependency on the original node, since this isn't the point of
+scheduling children at the same time and can break some expectations of
+the rest of the code.
+---
+ src/gallium/drivers/lima/ir/gp/scheduler.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/scheduler.c b/src/gallium/drivers/lima/ir/gp/scheduler.c
+index 076794a4860..3b490974fc0 100644
+--- a/src/gallium/drivers/lima/ir/gp/scheduler.c
++++ b/src/gallium/drivers/lima/ir/gp/scheduler.c
+@@ -706,7 +706,7 @@ static int _schedule_try_node(sched_ctx *ctx, gpir_node *node, bool speculative)
+    int score = 0;
+ 
+    gpir_node_foreach_pred(node, dep) {
+-      if (!gpir_is_input_node(dep->pred))
++      if (dep->type != GPIR_DEP_INPUT)
+          continue;
+ 
+       int pred_score = INT_MIN;
+-- 
+2.22.0
+
+
+From 532a3e51a8daee766b92559c0d5a3163cd3b2c34 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Wed, 28 Aug 2019 10:57:35 +0200
+Subject: [PATCH 3/7] lima/gpir: Support branch instructions
+
+Because branch conditions have to be in the pass slot, there is no
+unconditional branch, and realistically the pass slot has to contain a
+move when branching (there's nothing it does that would be useful for
+operating on booleans, so we can't use it for anything when computing
+the branch condition), we put the branch instruction in the pass slot
+and at codegen time turn it into a move of the branch condition. This
+means that it doesn't have to be special-cased like store instructions
+are in the scheduler. Because of this decision we can remove the
+half-implemented BRANCH codegen slot. Finally, we (ab)use the existing
+schedule_first mechanism to make sure that branches are always last in
+the basic block.
+---
+ src/gallium/drivers/lima/ir/gp/codegen.c |  31 ++++---
+ src/gallium/drivers/lima/ir/gp/gpir.h    |  13 ++-
+ src/gallium/drivers/lima/ir/gp/instr.c   |   1 -
+ src/gallium/drivers/lima/ir/gp/lower.c   |  21 +++++
+ src/gallium/drivers/lima/ir/gp/nir.c     | 108 ++++++++++-------------
+ src/gallium/drivers/lima/ir/gp/node.c    |   6 ++
+ 6 files changed, 102 insertions(+), 78 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/codegen.c b/src/gallium/drivers/lima/ir/gp/codegen.c
+index 76e360b4fb1..113a8a0c0f3 100644
+--- a/src/gallium/drivers/lima/ir/gp/codegen.c
++++ b/src/gallium/drivers/lima/ir/gp/codegen.c
+@@ -45,8 +45,6 @@ static gpir_codegen_src gpir_get_alu_input(gpir_node *parent, gpir_node *child)
+          gpir_codegen_src_unused, gpir_codegen_src_p1_complex, gpir_codegen_src_unused },
+       [GPIR_INSTR_SLOT_PASS] = {
+          gpir_codegen_src_unused, gpir_codegen_src_p1_pass, gpir_codegen_src_p2_pass },
+-      [GPIR_INSTR_SLOT_BRANCH] = {
+-         gpir_codegen_src_unused, gpir_codegen_src_unused, gpir_codegen_src_unused },
+ 
+       [GPIR_INSTR_SLOT_REG0_LOAD0] = {
+          gpir_codegen_src_attrib_x, gpir_codegen_src_p1_attrib_x, gpir_codegen_src_unused },
+@@ -418,6 +416,22 @@ static void gpir_codegen_pass_slot(gpir_codegen_instr *code, gpir_instr *instr)
+       return;
+    }
+ 
++   if (node->op == gpir_op_branch_cond) {
++      gpir_branch_node *branch = gpir_node_to_branch(node);
++
++      code->pass_op = gpir_codegen_pass_op_pass;
++      code->pass_src = gpir_get_alu_input(node, branch->cond);
++
++      /* Fill out branch information */
++      unsigned offset = branch->dest->instr_offset;
++      assert(offset < 0x200);
++      code->branch = true;
++      code->branch_target = offset & 0xff;
++      code->branch_target_lo = !(offset >> 8);
++      code->unknown_1 = 13;
++      return;
++   }
++
+    gpir_alu_node *alu = gpir_node_to_alu(node);
+    code->pass_src = gpir_get_alu_input(node, alu->children[0]);
+ 
+@@ -434,16 +448,7 @@ static void gpir_codegen_pass_slot(gpir_codegen_instr *code, gpir_instr *instr)
+    default:
+       assert(0);
+    }
+-}
+-
+-static void gpir_codegen_branch_slot(gpir_codegen_instr *code, gpir_instr *instr)
+-{
+-   gpir_node *node = instr->slots[GPIR_INSTR_SLOT_BRANCH];
+-
+-   if (!node)
+-      return;
+ 
+-   assert(0);
+ }
+ 
+ static void gpir_codegen_reg0_slot(gpir_codegen_instr *code, gpir_instr *instr)
+@@ -483,7 +488,7 @@ static gpir_codegen_store_src gpir_get_store_input(gpir_node *node)
+       [GPIR_INSTR_SLOT_ADD1] = gpir_codegen_store_src_acc_1,
+       [GPIR_INSTR_SLOT_COMPLEX] = gpir_codegen_store_src_complex,
+       [GPIR_INSTR_SLOT_PASS] = gpir_codegen_store_src_pass,
+-      [GPIR_INSTR_SLOT_BRANCH...GPIR_INSTR_SLOT_STORE3] = gpir_codegen_store_src_none,
++      [GPIR_INSTR_SLOT_REG0_LOAD0...GPIR_INSTR_SLOT_STORE3] = gpir_codegen_store_src_none,
+    };
+ 
+    gpir_store_node *store = gpir_node_to_store(node);
+@@ -546,7 +551,6 @@ static void gpir_codegen(gpir_codegen_instr *code, gpir_instr *instr)
+ 
+    gpir_codegen_complex_slot(code, instr);
+    gpir_codegen_pass_slot(code, instr);
+-   gpir_codegen_branch_slot(code, instr);
+ 
+    gpir_codegen_reg0_slot(code, instr);
+    gpir_codegen_reg1_slot(code, instr);
+@@ -574,6 +578,7 @@ bool gpir_codegen_prog(gpir_compiler *comp)
+ {
+    int num_instr = 0;
+    list_for_each_entry(gpir_block, block, &comp->block_list, list) {
++      block->instr_offset = num_instr;
+       num_instr += list_length(&block->instr_list);
+    }
+ 
+diff --git a/src/gallium/drivers/lima/ir/gp/gpir.h b/src/gallium/drivers/lima/ir/gp/gpir.h
+index 24924c92567..6cbd406032e 100644
+--- a/src/gallium/drivers/lima/ir/gp/gpir.h
++++ b/src/gallium/drivers/lima/ir/gp/gpir.h
+@@ -246,7 +246,6 @@ enum gpir_instr_slot {
+    GPIR_INSTR_SLOT_ADD1,
+    GPIR_INSTR_SLOT_PASS,
+    GPIR_INSTR_SLOT_COMPLEX,
+-   GPIR_INSTR_SLOT_BRANCH,
+    GPIR_INSTR_SLOT_REG0_LOAD0,
+    GPIR_INSTR_SLOT_REG0_LOAD1,
+    GPIR_INSTR_SLOT_REG0_LOAD2,
+@@ -347,6 +346,13 @@ typedef struct gpir_block {
+    struct list_head instr_list;
+    struct gpir_compiler *comp;
+ 
++   struct gpir_block *successors[2];
++   struct list_head predecessors;
++   struct list_head predecessors_node;
++
++   /* For codegen, the offset in the final program. */
++   unsigned instr_offset;
++
+    /* for scheduler */
+    union {
+       struct {
+@@ -361,6 +367,7 @@ typedef struct gpir_block {
+ typedef struct {
+    gpir_node node;
+    gpir_block *dest;
++   gpir_node *cond;
+ } gpir_branch_node;
+ 
+ struct lima_vs_shader_state;
+@@ -376,6 +383,9 @@ typedef struct gpir_compiler {
+    /* array for searching ssa node */
+    gpir_node **var_nodes;
+ 
++   /* gpir block for NIR block. */
++   gpir_block **blocks;
++
+    /* for physical reg */
+    struct list_head reg_list;
+    int cur_reg;
+@@ -433,6 +443,7 @@ static inline bool gpir_node_is_leaf(gpir_node *node)
+ #define gpir_node_to_const(node) ((gpir_const_node *)(node))
+ #define gpir_node_to_load(node) ((gpir_load_node *)(node))
+ #define gpir_node_to_store(node) ((gpir_store_node *)(node))
++#define gpir_node_to_branch(node) ((gpir_branch_node *)(node))
+ 
+ gpir_instr *gpir_instr_create(gpir_block *block);
+ bool gpir_instr_try_insert_node(gpir_instr *instr, gpir_node *node);
+diff --git a/src/gallium/drivers/lima/ir/gp/instr.c b/src/gallium/drivers/lima/ir/gp/instr.c
+index 45e9d817143..5cfb7e34a02 100644
+--- a/src/gallium/drivers/lima/ir/gp/instr.c
++++ b/src/gallium/drivers/lima/ir/gp/instr.c
+@@ -535,7 +535,6 @@ void gpir_instr_print_prog(gpir_compiler *comp)
+       [GPIR_INSTR_SLOT_REG0_LOAD3] = { 15, "load0" },
+       [GPIR_INSTR_SLOT_REG1_LOAD3] = { 15, "load1" },
+       [GPIR_INSTR_SLOT_MEM_LOAD3] = { 15, "load2" },
+-      [GPIR_INSTR_SLOT_BRANCH] = { 4, "bnch" },
+       [GPIR_INSTR_SLOT_STORE3] = { 15, "store" },
+       [GPIR_INSTR_SLOT_COMPLEX] = { 4, "cmpl" },
+       [GPIR_INSTR_SLOT_PASS] = { 4, "pass" },
+diff --git a/src/gallium/drivers/lima/ir/gp/lower.c b/src/gallium/drivers/lima/ir/gp/lower.c
+index 6d6aa7e80ff..eaeeeb8f1eb 100644
+--- a/src/gallium/drivers/lima/ir/gp/lower.c
++++ b/src/gallium/drivers/lima/ir/gp/lower.c
+@@ -413,6 +413,26 @@ static bool gpir_lower_not(gpir_block *block, gpir_node *node)
+    return true;
+ }
+ 
++/* There is no unconditional branch instruction, so we have to lower it to a
++ * conditional branch with a condition of 1.0.
++ */
++
++static bool gpir_lower_branch_uncond(gpir_block *block, gpir_node *node)
++{
++   gpir_branch_node *branch = gpir_node_to_branch(node);
++
++   gpir_node *node_const = gpir_node_create(block, gpir_op_const);
++   gpir_const_node *c = gpir_node_to_const(node_const);
++
++   list_addtail(&c->node.list, &node->list);
++   c->value.f = 1.0f;
++   gpir_node_add_dep(&branch->node, &c->node, GPIR_DEP_INPUT);
++
++   branch->node.op = gpir_op_branch_cond;
++   branch->cond = node_const;
++
++   return true;
++}
+ 
+ static bool (*gpir_pre_rsched_lower_funcs[gpir_op_num])(gpir_block *, gpir_node *) = {
+    [gpir_op_not] = gpir_lower_not,
+@@ -424,6 +444,7 @@ static bool (*gpir_pre_rsched_lower_funcs[gpir_op_num])(gpir_block *, gpir_node
+    [gpir_op_eq] = gpir_lower_eq_ne,
+    [gpir_op_ne] = gpir_lower_eq_ne,
+    [gpir_op_abs] = gpir_lower_abs,
++   [gpir_op_branch_uncond] = gpir_lower_branch_uncond,
+ };
+ 
+ bool gpir_pre_rsched_lower_prog(gpir_compiler *comp)
+diff --git a/src/gallium/drivers/lima/ir/gp/nir.c b/src/gallium/drivers/lima/ir/gp/nir.c
+index 6dcb4d88f02..e2dc939f1a0 100644
+--- a/src/gallium/drivers/lima/ir/gp/nir.c
++++ b/src/gallium/drivers/lima/ir/gp/nir.c
+@@ -272,8 +272,8 @@ static bool gpir_emit_tex(gpir_block *block, nir_instr *ni)
+ 
+ static bool gpir_emit_jump(gpir_block *block, nir_instr *ni)
+ {
+-   gpir_error("nir_jump_instr not support\n");
+-   return false;
++   /* Jumps are emitted at the end of the basic block, so do nothing. */
++   return true;
+ }
+ 
+ static bool (*gpir_emit_instr[nir_instr_type_phi])(gpir_block *, nir_instr *) = {
+@@ -285,79 +285,61 @@ static bool (*gpir_emit_instr[nir_instr_type_phi])(gpir_block *, nir_instr *) =
+    [nir_instr_type_jump]       = gpir_emit_jump,
+ };
+ 
+-static gpir_block *gpir_block_create(gpir_compiler *comp)
++static bool gpir_emit_function(gpir_compiler *comp, nir_function_impl *impl)
+ {
+-   gpir_block *block = ralloc(comp, gpir_block);
+-   if (!block)
+-      return NULL;
++   nir_index_blocks(impl);
++   comp->blocks = ralloc_array(comp, gpir_block *, impl->num_blocks);
+ 
+-   list_inithead(&block->node_list);
+-   list_inithead(&block->instr_list);
++   nir_foreach_block(block_nir, impl) {
++      gpir_block *block = ralloc(comp, gpir_block);
++      if (!block)
++         return false;
+ 
+-   return block;
+-}
++      list_inithead(&block->node_list);
++      list_inithead(&block->instr_list);
+ 
+-static bool gpir_emit_block(gpir_compiler *comp, nir_block *nblock)
+-{
+-   gpir_block *block = gpir_block_create(comp);
+-   if (!block)
+-      return false;
++      list_addtail(&block->list, &comp->block_list);
++      block->comp = comp;
++      comp->blocks[block_nir->index] = block;
++   }
+ 
+-   list_addtail(&block->list, &comp->block_list);
+-   block->comp = comp;
++   nir_foreach_block(block_nir, impl) {
++      gpir_block *block = comp->blocks[block_nir->index];
++      nir_foreach_instr(instr, block_nir) {
++         assert(instr->type < nir_instr_type_phi);
++         if (!gpir_emit_instr[instr->type](block, instr))
++            return false;
++      }
+ 
+-   nir_foreach_instr(instr, nblock) {
+-      assert(instr->type < nir_instr_type_phi);
+-      if (!gpir_emit_instr[instr->type](block, instr))
+-         return false;
+-   }
++      if (block_nir->successors[0] == impl->end_block)
++         block->successors[0] = NULL;
++      else
++         block->successors[0] = comp->blocks[block_nir->successors[0]->index];
++      block->successors[1] = NULL;
+ 
+-   return true;
+-}
++      if (block_nir->successors[1] != NULL) {
++         nir_if *nif = nir_cf_node_as_if(nir_cf_node_next(&block_nir->cf_node));
++         gpir_alu_node *cond = gpir_node_create(block, gpir_op_not);
++         list_addtail(&cond->node.list, &block->node_list);
++         cond->children[0] = gpir_node_find(block, &cond->node, &nif->condition, 0);
++         gpir_node_add_dep(&cond->node, cond->children[0], GPIR_DEP_INPUT);
+ 
+-static bool gpir_emit_if(gpir_compiler *comp, nir_if *nif)
+-{
+-   gpir_error("if nir_cf_node not support\n");
+-   return false;
+-}
++         gpir_branch_node *branch = gpir_node_create(block, gpir_op_branch_cond);
++         list_addtail(&branch->node.list, &block->node_list);
+ 
+-static bool gpir_emit_loop(gpir_compiler *comp, nir_loop *nloop)
+-{
+-   gpir_error("loop nir_cf_node not support\n");
+-   return false;
+-}
++         branch->dest = comp->blocks[block_nir->successors[1]->index];
++         block->successors[1] = branch->dest;
+ 
+-static bool gpir_emit_function(gpir_compiler *comp, nir_function_impl *nfunc)
+-{
+-   gpir_error("function nir_cf_node not support\n");
+-   return false;
+-}
++         branch->cond = &cond->node;
++         gpir_node_add_dep(&branch->node, &cond->node, GPIR_DEP_INPUT);
+ 
+-static bool gpir_emit_cf_list(gpir_compiler *comp, struct exec_list *list)
+-{
+-   foreach_list_typed(nir_cf_node, node, node, list) {
+-      bool ret;
++         assert(block_nir->successors[0]->index == block_nir->index + 1);
++      } else if (block_nir->successors[0]->index != block_nir->index + 1) {
++         gpir_branch_node *branch = gpir_node_create(block, gpir_op_branch_uncond);
++         list_addtail(&branch->node.list, &block->node_list);
+ 
+-      switch (node->type) {
+-      case nir_cf_node_block:
+-         ret = gpir_emit_block(comp, nir_cf_node_as_block(node));
+-         break;
+-      case nir_cf_node_if:
+-         ret = gpir_emit_if(comp, nir_cf_node_as_if(node));
+-         break;
+-      case nir_cf_node_loop:
+-         ret = gpir_emit_loop(comp, nir_cf_node_as_loop(node));
+-         break;
+-      case nir_cf_node_function:
+-         ret = gpir_emit_function(comp, nir_cf_node_as_function(node));
+-         break;
+-      default:
+-         gpir_error("unknown NIR node type %d\n", node->type);
+-         return false;
++         branch->dest = comp->blocks[block_nir->successors[0]->index];
+       }
+-
+-      if (!ret)
+-         return false;
+    }
+ 
+    return true;
+@@ -430,7 +412,7 @@ bool gpir_compile_nir(struct lima_vs_shader_state *prog, struct nir_shader *nir,
+    comp->constant_base = nir->num_uniforms;
+    prog->uniform_pending_offset = nir->num_uniforms * 16;
+ 
+-   if (!gpir_emit_cf_list(comp, &func->body))
++   if (!gpir_emit_function(comp, func))
+       goto err_out0;
+ 
+    gpir_node_print_prog_seq(comp);
+diff --git a/src/gallium/drivers/lima/ir/gp/node.c b/src/gallium/drivers/lima/ir/gp/node.c
+index 1bf9d806c30..e62512890b3 100644
+--- a/src/gallium/drivers/lima/ir/gp/node.c
++++ b/src/gallium/drivers/lima/ir/gp/node.c
+@@ -246,6 +246,8 @@ const gpir_op_info gpir_op_infos[] = {
+    [gpir_op_branch_cond] = {
+       .name = "branch_cond",
+       .type = gpir_node_type_branch,
++      .schedule_first = true,
++      .slots = (int []) { GPIR_INSTR_SLOT_PASS, GPIR_INSTR_SLOT_END },
+    },
+    [gpir_op_const] = {
+       .name = "const",
+@@ -380,6 +382,10 @@ void gpir_node_replace_child(gpir_node *parent, gpir_node *old_child,
+       gpir_store_node *store = gpir_node_to_store(parent);
+       if (store->child == old_child)
+          store->child = new_child;
++   } else if (parent->type == gpir_node_type_branch) {
++      gpir_branch_node *branch = gpir_node_to_branch(parent);
++      if (branch->cond == old_child)
++         branch->cond = new_child;
+    }
+ }
+ 
+-- 
+2.22.0
+
+
+From 1eb9dee8d5b4bb5ad6644078af027bbd363b6b15 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Fri, 13 Sep 2019 13:23:56 +0700
+Subject: [PATCH 4/7] lima/gpir: Use registers for values live in multiple
+ blocks
+
+This commit adds the framework for cross-basic-block register
+allocation. Like ARM's compiler, we assume that the value registers
+aren't usable across branches, which means we have to use physical
+registers to store any value that crosses a basic block. There are three
+parts to this:
+
+1. When translating to NIR, we rely on the NIR out-of-ssa pass to
+coalesce values into registers. We insert store_reg instructions for
+values used in more than one basic block, and load_reg instructions for
+values not defined in the same basic block (or defined after their use,
+for loops). So by the time we've translated out of NIR we've already
+split things into values (which are only used in the same basic block)
+and registers (which are only used in different basic blocks than where
+they're defined).
+
+2. We allocate the registers at the same time that we allocate the
+values, before the final scheduler. Unlike the values, where the
+assigned color is fake, we assign the actual physical index & component
+to physregs at this stage. load_reg and store_reg are treated as moves
+in the allocator and when creating write-after-read dependencies.
+
+3. Finally, in the main scheduler we have to avoid overwriting existing
+live physregs when spilling. First, we have to tell the scheduler which
+physical registers are live at the end of each block, to avoid
+overwriting those. If a register is only live at the beginning, we can
+reuse it for spilling after the last original use in the final program
+happens, i.e. before any original use is scheduled, but we have to be
+careful to add the proper dependencies so that the spill write is
+scheduled before the original reads. To handle this we repurpose
+reg_link for uses to be used by the scheduler.
+
+A few register-related things copied over from NIR or from other
+drivers can be dropped.
+---
+ src/gallium/drivers/lima/ir/gp/gpir.h         |  39 +-
+ src/gallium/drivers/lima/ir/gp/lower.c        |   5 +-
+ src/gallium/drivers/lima/ir/gp/nir.c          | 122 +++--
+ src/gallium/drivers/lima/ir/gp/node.c         |  11 -
+ .../drivers/lima/ir/gp/reduce_scheduler.c     |  52 +-
+ src/gallium/drivers/lima/ir/gp/regalloc.c     | 497 ++++++++++++++++--
+ src/gallium/drivers/lima/ir/gp/scheduler.c    |  71 ++-
+ 7 files changed, 641 insertions(+), 156 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/gpir.h b/src/gallium/drivers/lima/ir/gp/gpir.h
+index 6cbd406032e..4d11fb1eaa7 100644
+--- a/src/gallium/drivers/lima/ir/gp/gpir.h
++++ b/src/gallium/drivers/lima/ir/gp/gpir.h
+@@ -211,11 +211,6 @@ typedef struct {
+ typedef struct {
+    int index;
+    struct list_head list;
+-
+-   struct list_head defs_list;
+-   struct list_head uses_list;
+-
+-   int start, end;
+ } gpir_reg;
+ 
+ typedef struct {
+@@ -236,7 +231,6 @@ typedef struct gpir_store_node {
+    gpir_node *child;
+ 
+    gpir_reg *reg;
+-   struct list_head reg_link;
+ } gpir_store_node;
+ 
+ enum gpir_instr_slot {
+@@ -350,6 +344,26 @@ typedef struct gpir_block {
+    struct list_head predecessors;
+    struct list_head predecessors_node;
+ 
++   /* for regalloc */
++
++   /* The set of live registers, i.e. registers whose value may be used
++    * eventually, at the beginning of the block.
++    */
++   BITSET_WORD *live_in;
++
++   /* Set of live registers at the end of the block. */
++   BITSET_WORD *live_out;
++
++   /* Set of registers that may have a value defined at the end of the
++    * block.
++    */
++   BITSET_WORD *def_out;
++
++   /* After register allocation, the set of live physical registers at the end
++    * of the block. Needed for scheduling.
++    */
++   uint64_t live_out_phys;
++
+    /* For codegen, the offset in the final program. */
+    unsigned instr_offset;
+ 
+@@ -380,8 +394,17 @@ typedef struct gpir_compiler {
+    struct list_head block_list;
+    int cur_index;
+ 
+-   /* array for searching ssa node */
+-   gpir_node **var_nodes;
++   /* Find the gpir node for a given NIR SSA def. */
++   gpir_node **node_for_ssa;
++
++   /* Find the gpir node for a given NIR register. */
++   gpir_node **node_for_reg;
++
++   /* Find the gpir register for a given NIR SSA def. */
++   gpir_reg **reg_for_ssa;
++
++   /* Find the gpir register for a given NIR register. */
++   gpir_reg **reg_for_reg;
+ 
+    /* gpir block for NIR block. */
+    gpir_block **blocks;
+diff --git a/src/gallium/drivers/lima/ir/gp/lower.c b/src/gallium/drivers/lima/ir/gp/lower.c
+index eaeeeb8f1eb..296f141216e 100644
+--- a/src/gallium/drivers/lima/ir/gp/lower.c
++++ b/src/gallium/drivers/lima/ir/gp/lower.c
+@@ -109,10 +109,7 @@ static bool gpir_lower_load(gpir_compiler *comp)
+                gpir_load_node *nload = gpir_node_to_load(new);
+                nload->index = load->index;
+                nload->component = load->component;
+-               if (load->reg) {
+-                  nload->reg = load->reg;
+-                  list_addtail(&nload->reg_link, &load->reg->uses_list);
+-               }
++               nload->reg = load->reg;
+ 
+                gpir_node_replace_pred(dep, new);
+                gpir_node_replace_child(succ, node, new);
+diff --git a/src/gallium/drivers/lima/ir/gp/nir.c b/src/gallium/drivers/lima/ir/gp/nir.c
+index e2dc939f1a0..8d9a5beb98a 100644
+--- a/src/gallium/drivers/lima/ir/gp/nir.c
++++ b/src/gallium/drivers/lima/ir/gp/nir.c
+@@ -30,37 +30,80 @@
+ #include "gpir.h"
+ #include "lima_context.h"
+ 
++gpir_reg *gpir_create_reg(gpir_compiler *comp)
++{
++   gpir_reg *reg = ralloc(comp, gpir_reg);
++   reg->index = comp->cur_reg++;
++   list_addtail(&reg->list, &comp->reg_list);
++   return reg;
++}
++
++static gpir_reg *reg_for_nir_reg(gpir_compiler *comp, nir_register *nir_reg)
++{
++   unsigned index = nir_reg->index;
++   gpir_reg *reg = comp->reg_for_reg[index];
++   if (reg)
++      return reg;
++   reg = gpir_create_reg(comp);
++   comp->reg_for_reg[index] = reg;
++   return reg;
++}
+ 
+-static inline void *gpir_node_create_ssa(gpir_block *block, gpir_op op, nir_ssa_def *ssa)
++static inline gpir_node *gpir_node_create_ssa(gpir_block *block, gpir_op op, nir_ssa_def *ssa)
+ {
+    int index = ssa->index;
+    gpir_node *node = gpir_node_create(block, op);
+ 
+-   block->comp->var_nodes[index] = node;
++   block->comp->node_for_ssa[index] = node;
+    snprintf(node->name, sizeof(node->name), "ssa%d", index);
+    list_addtail(&node->list, &block->node_list);
++
++   /* If any uses are outside the current block, we'll need to create a store
++    * instruction for them.
++    */
++   bool needs_register = false;
++   nir_foreach_use(use, ssa) {
++      if (use->parent_instr->block != ssa->parent_instr->block) {
++         needs_register = true;
++         break;
++      }
++   }
++
++   if (!needs_register) {
++      nir_foreach_if_use(use, ssa) {
++         if (nir_cf_node_prev(&use->parent_if->cf_node) !=
++             &ssa->parent_instr->block->cf_node) {
++            needs_register = true;
++            break;
++         }
++      }
++   }
++
++   if (needs_register) {
++      gpir_store_node *store = gpir_node_create(block, gpir_op_store_reg);
++      store->child = node;
++      store->reg = gpir_create_reg(block->comp);
++      gpir_node_add_dep(&store->node, node, GPIR_DEP_INPUT);
++      list_addtail(&store->node.list, &block->node_list);
++      block->comp->reg_for_ssa[ssa->index] = store->reg;
++   }
++
+    return node;
+ }
+ 
+-static inline void *gpir_node_create_reg(gpir_block *block, gpir_op op, nir_reg_dest *reg)
++static inline void *gpir_node_create_reg(gpir_block *block, gpir_op op, nir_reg_dest *nir_reg)
+ {
+-   int index = reg->reg->index;
++   int index = nir_reg->reg->index;
+    gpir_node *node = gpir_node_create(block, op);
++   block->comp->node_for_reg[index] = node;
+    gpir_store_node *store = gpir_node_create(block, gpir_op_store_reg);
+ 
+    snprintf(node->name, sizeof(node->name), "reg%d", index);
+ 
+    store->child = node;
++   store->reg = reg_for_nir_reg(block->comp, nir_reg->reg);
+    gpir_node_add_dep(&store->node, node, GPIR_DEP_INPUT);
+ 
+-   list_for_each_entry(gpir_reg, reg, &block->comp->reg_list, list) {
+-      if (reg->index == index) {
+-         store->reg = reg;
+-         list_addtail(&store->reg_link, &reg->defs_list);
+-         break;
+-      }
+-   }
+-
+    list_addtail(&node->list, &block->node_list);
+    list_addtail(&store->node.list, &block->node_list);
+    return node;
+@@ -77,35 +120,34 @@ static void *gpir_node_create_dest(gpir_block *block, gpir_op op, nir_dest *dest
+ static gpir_node *gpir_node_find(gpir_block *block, gpir_node *succ, nir_src *src,
+                                  int channel)
+ {
++   gpir_reg *reg = NULL;
+    gpir_node *pred = NULL;
+-
+    if (src->is_ssa) {
+       if (src->ssa->num_components > 1) {
+          for (int i = 0; i < GPIR_VECTOR_SSA_NUM; i++) {
+             if (block->comp->vector_ssa[i].ssa == src->ssa->index) {
+-               pred = block->comp->vector_ssa[i].nodes[channel];
+-               break;
++               return block->comp->vector_ssa[i].nodes[channel];
+             }
+          }
+-      } else
+-         pred = block->comp->var_nodes[src->ssa->index];
+-
+-      assert(pred);
+-   }
+-   else {
+-      pred = gpir_node_create(block, gpir_op_load_reg);
+-      list_addtail(&pred->list, &succ->list);
+-
+-      gpir_load_node *load = gpir_node_to_load(pred);
+-      list_for_each_entry(gpir_reg, reg, &block->comp->reg_list, list) {
+-         if (reg->index == src->reg.reg->index) {
+-            load->reg = reg;
+-            list_addtail(&load->reg_link, &reg->uses_list);
+-            break;
+-         }
++      } else {
++         gpir_node *pred = block->comp->node_for_ssa[src->ssa->index];
++         if (pred->block == block)
++            return pred;
++         reg = block->comp->reg_for_ssa[src->ssa->index];
+       }
++   } else {
++      pred = block->comp->node_for_reg[src->reg.reg->index];
++      if (pred && pred->block == block && pred != succ)
++         return pred;
++      reg = reg_for_nir_reg(block->comp, src->reg.reg);
+    }
+ 
++   assert(reg);
++   pred = gpir_node_create(block, gpir_op_load_reg);
++   gpir_load_node *load = gpir_node_to_load(pred);
++   load->reg = reg;
++   list_addtail(&pred->list, &succ->list);
++
+    return pred;
+ }
+ 
+@@ -345,16 +387,6 @@ static bool gpir_emit_function(gpir_compiler *comp, nir_function_impl *impl)
+    return true;
+ }
+ 
+-gpir_reg *gpir_create_reg(gpir_compiler *comp)
+-{
+-   gpir_reg *reg = ralloc(comp, gpir_reg);
+-   reg->index = comp->cur_reg++;
+-   list_addtail(&reg->list, &comp->reg_list);
+-   list_inithead(&reg->defs_list);
+-   list_inithead(&reg->uses_list);
+-   return reg;
+-}
+-
+ static gpir_compiler *gpir_compiler_create(void *prog, unsigned num_reg, unsigned num_ssa)
+ {
+    gpir_compiler *comp = rzalloc(prog, gpir_compiler);
+@@ -362,13 +394,13 @@ static gpir_compiler *gpir_compiler_create(void *prog, unsigned num_reg, unsigne
+    list_inithead(&comp->block_list);
+    list_inithead(&comp->reg_list);
+ 
+-   for (int i = 0; i < num_reg; i++)
+-      gpir_create_reg(comp);
+-
+    for (int i = 0; i < GPIR_VECTOR_SSA_NUM; i++)
+       comp->vector_ssa[i].ssa = -1;
+ 
+-   comp->var_nodes = rzalloc_array(comp, gpir_node *, num_ssa);
++   comp->node_for_ssa = rzalloc_array(comp, gpir_node *, num_ssa);
++   comp->node_for_reg = rzalloc_array(comp, gpir_node *, num_reg);
++   comp->reg_for_ssa = rzalloc_array(comp, gpir_reg *, num_ssa);
++   comp->reg_for_reg = rzalloc_array(comp, gpir_reg *, num_reg);
+    comp->prog = prog;
+    return comp;
+ }
+diff --git a/src/gallium/drivers/lima/ir/gp/node.c b/src/gallium/drivers/lima/ir/gp/node.c
+index e62512890b3..78f7bd130ea 100644
+--- a/src/gallium/drivers/lima/ir/gp/node.c
++++ b/src/gallium/drivers/lima/ir/gp/node.c
+@@ -433,17 +433,6 @@ void gpir_node_delete(gpir_node *node)
+       ralloc_free(dep);
+    }
+ 
+-   if (node->type == gpir_node_type_store) {
+-      gpir_store_node *store = gpir_node_to_store(node);
+-      if (store->reg)
+-         list_del(&store->reg_link);
+-   }
+-   else if (node->type == gpir_node_type_load) {
+-      gpir_load_node *load = gpir_node_to_load(node);
+-      if (load->reg)
+-         list_del(&load->reg_link);
+-   }
+-
+    list_del(&node->list);
+    ralloc_free(node);
+ }
+diff --git a/src/gallium/drivers/lima/ir/gp/reduce_scheduler.c b/src/gallium/drivers/lima/ir/gp/reduce_scheduler.c
+index a5013a59dbf..d51fc355f2b 100644
+--- a/src/gallium/drivers/lima/ir/gp/reduce_scheduler.c
++++ b/src/gallium/drivers/lima/ir/gp/reduce_scheduler.c
+@@ -190,21 +190,47 @@ static void schedule_block(gpir_block *block)
+    schedule_ready_list(block, &ready_list);
+ }
+ 
+-bool gpir_reduce_reg_pressure_schedule_prog(gpir_compiler *comp)
++/* Due to how we translate from NIR, we never read a register written in the
++ * same block (we just pass the node through instead), so we don't have to
++ * worry about read-after-write dependencies. We do have to worry about
++ * write-after-read though, so we add those dependencies now. For example in a
++ * loop like this we need a dependency between the write and the read of i:
++ *
++ * i = ...
++ * while (...) {
++ *    ... = i;
++ *    i = i + 1;
++ * }
++ */
++
++static void add_false_dependencies(gpir_compiler *comp)
+ {
+-   /* No need to build physical reg load/store dependency here,
+-    * because we just exit SSA form, there should be at most
+-    * one load and one store pair for a physical reg within a
+-    * block, and the store must be after load with the output
+-    * of load as input after some calculation. So we don't need to
+-    * insert extra write-after-read or read-after-write dependecy
+-    * for load/store nodes to maintain the right sequence before
+-    * scheduling.
+-    *
+-    * Also no need to handle SSA def/use in difference block,
+-    * because we'll load/store SSA to a physical reg if def/use
+-    * are not in the same block.
++   /* Make sure we allocate this only once, in case there are many values and
++    * many blocks.
+     */
++   gpir_node **last_written = calloc(comp->cur_reg, sizeof(gpir_node *));
++
++   list_for_each_entry(gpir_block, block, &comp->block_list, list) {
++      list_for_each_entry_rev(gpir_node, node, &block->node_list, list) {
++         if (node->op == gpir_op_load_reg) {
++            gpir_load_node *load = gpir_node_to_load(node);
++            gpir_node *store = last_written[load->reg->index];
++            if (store && store->block == block) {
++               gpir_node_add_dep(store, node, GPIR_DEP_WRITE_AFTER_READ);
++            }
++         } else if (node->op == gpir_op_store_reg) {
++            gpir_store_node *store = gpir_node_to_store(node);
++            last_written[store->reg->index] = node;
++         }
++      }
++   }
++
++   free(last_written);
++}
++
++bool gpir_reduce_reg_pressure_schedule_prog(gpir_compiler *comp)
++{
++   add_false_dependencies(comp);
+ 
+    list_for_each_entry(gpir_block, block, &comp->block_list, list) {
+       block->rsched.node_index = 0;
+diff --git a/src/gallium/drivers/lima/ir/gp/regalloc.c b/src/gallium/drivers/lima/ir/gp/regalloc.c
+index c145bfbee81..133633c7e59 100644
+--- a/src/gallium/drivers/lima/ir/gp/regalloc.c
++++ b/src/gallium/drivers/lima/ir/gp/regalloc.c
+@@ -23,69 +23,430 @@
+  */
+ 
+ #include "gpir.h"
++#include "util/u_dynarray.h"
+ 
+-/* Register allocation
+- *
+- * TODO: This needs to be rewritten when we support multiple basic blocks. We
+- * need to do proper liveness analysis, combined with either linear scan,
+- * graph coloring, or SSA-based allocation. We should also support spilling to
+- * temporaries.
+- *
+- * For now, this only assigns fake registers to values, used to build the fake
+- * dependencies that the scheduler relies on. In the future we should also be
+- * assigning actual physreg numbers to load_reg/store_reg nodes.
+- */
++/* Per-register information */
++
++struct reg_info {
++   BITSET_WORD *conflicts;
++   struct util_dynarray conflict_list;
++
++   /* Number of conflicts that must be allocated to physical registers.
++    */
++   unsigned phys_conflicts;
++
++   unsigned node_conflicts;
++
++   /* Number of conflicts that can be allocated to either. */
++   unsigned total_conflicts;
++
++   int assigned_color;
++
++   bool visited;
++};
+ 
+-static void regalloc_block(gpir_block *block)
++struct regalloc_ctx {
++   unsigned bitset_words, num_nodes_and_regs;
++   struct reg_info *registers;
++
++   /* Reusable scratch liveness array */
++   BITSET_WORD *live;
++
++   unsigned *worklist;
++   unsigned worklist_start, worklist_end;
++
++   unsigned *stack;
++   unsigned stack_size;
++
++   gpir_compiler *comp;
++   void *mem_ctx;
++};
++
++/* Liveness analysis */
++
++static void propagate_liveness_instr(gpir_node *node, BITSET_WORD *live,
++                                     gpir_compiler *comp)
+ {
+-   /* build each node sequence index in the block node list */
+-   int index = 0;
+-   list_for_each_entry(gpir_node, node, &block->node_list, list) {
+-      node->vreg.index = index++;
++   /* KILL */
++   if (node->type == gpir_node_type_store) {
++      if (node->op == gpir_op_store_reg) {
++         gpir_store_node *store = gpir_node_to_store(node);
++         BITSET_CLEAR(live, store->reg->index);
++      }
+    }
+ 
+-   /* find the last successor of each node by the sequence index */
+-   list_for_each_entry(gpir_node, node, &block->node_list, list) {
+-      node->vreg.last = NULL;
+-      gpir_node_foreach_succ(node, dep) {
+-         gpir_node *succ = dep->succ;
+-         if (!node->vreg.last || node->vreg.last->vreg.index < succ->vreg.index)
+-            node->vreg.last = succ;
++   /* GEN */
++   if (node->type == gpir_node_type_load) {
++      if (node->op == gpir_op_load_reg) {
++         gpir_load_node *load = gpir_node_to_load(node);
++         BITSET_SET(live, load->reg->index);
+       }
+    }
++}
++
++static bool propagate_liveness_block(gpir_block *block, struct regalloc_ctx *ctx)
++{
++   for (unsigned i = 0; i < 2; i++) {
++      if (block->successors[i]) {
++         for (unsigned j = 0; j < ctx->bitset_words; j++)
++            block->live_out[j] |= block->successors[i]->live_in[j];
++      }
++   }
++
++   memcpy(ctx->live, block->live_out, ctx->bitset_words * sizeof(BITSET_WORD));
++
++   list_for_each_entry_rev(gpir_node, node, &block->node_list, list) {
++      propagate_liveness_instr(node, ctx->live, block->comp);
++   }
+ 
+-   /* do linear scan regalloc */
+-   int reg_search_start = 0;
+-   gpir_node *active[GPIR_VALUE_REG_NUM + GPIR_PHYSICAL_REG_NUM] = {0};
++   bool changed = false;
++   for (unsigned i = 0; i < ctx->bitset_words; i++) {
++      changed |= (block->live_in[i] != ctx->live[i]);
++      block->live_in[i] = ctx->live[i];
++   }
++   return changed;
++}
++
++static void calc_def_block(gpir_block *block)
++{
+    list_for_each_entry(gpir_node, node, &block->node_list, list) {
+-      /* if some reg is expired */
+-      gpir_node_foreach_pred(node, dep) {
+-         gpir_node *pred = dep->pred;
+-         if (pred->vreg.last == node)
+-            active[pred->value_reg] = NULL;
+-      }
+-
+-      /* no need to alloc value reg for root node */
+-      if (gpir_node_is_root(node)) {
+-         node->value_reg = -1;
+-         continue;
+-      }
+-
+-      /* find a free reg for this node */
+-      int i;
+-      for (i = 0; i < GPIR_VALUE_REG_NUM + GPIR_PHYSICAL_REG_NUM; i++) {
+-         /* round robin reg select to reduce false dep when schedule */
+-         int reg = (reg_search_start + i) % (GPIR_VALUE_REG_NUM + GPIR_PHYSICAL_REG_NUM);
+-         if (!active[reg]) {
+-            active[reg] = node;
+-            node->value_reg = reg;
+-            reg_search_start++;
++      if (node->op == gpir_op_store_reg) {
++         gpir_store_node *store = gpir_node_to_store(node);
++         BITSET_SET(block->def_out, store->reg->index);
++      }
++   }
++}
++
++static void calc_liveness(struct regalloc_ctx *ctx)
++{
++   bool changed = true;
++   while (changed) {
++      changed = false;
++      list_for_each_entry_rev(gpir_block, block, &ctx->comp->block_list, list) {
++         changed |= propagate_liveness_block(block, ctx);
++      }
++   }
++
++   list_for_each_entry(gpir_block, block, &ctx->comp->block_list, list) {
++      calc_def_block(block);
++   }
++
++   changed = true;
++   while (changed) {
++      changed = false;
++      list_for_each_entry(gpir_block, block, &ctx->comp->block_list, list) {
++         for (unsigned i = 0; i < 2; i++) {
++            gpir_block *succ = block->successors[i];
++            if (!succ)
++               continue;
++
++            for (unsigned j = 0; j < ctx->bitset_words; j++) {
++               BITSET_WORD new = block->def_out[j] & ~succ->def_out[j];
++               changed |= (new != 0);
++               succ->def_out[j] |= block->def_out[j];
++            }
++         }
++      }
++   }
++}
++
++/* Interference calculation */
++
++static void add_interference(struct regalloc_ctx *ctx, unsigned i, unsigned j)
++{
++   if (i == j)
++      return;
++
++   struct reg_info *a = &ctx->registers[i];
++   struct reg_info *b = &ctx->registers[j];
++
++   if (BITSET_TEST(a->conflicts, j))
++      return;
++
++   BITSET_SET(a->conflicts, j);
++   BITSET_SET(b->conflicts, i);
++
++   a->total_conflicts++;
++   b->total_conflicts++;
++   if (j < ctx->comp->cur_reg)
++      a->phys_conflicts++;
++   else
++      a->node_conflicts++;
++
++   if (i < ctx->comp->cur_reg)
++      b->phys_conflicts++;
++   else
++      b->node_conflicts++;
++
++   util_dynarray_append(&a->conflict_list, unsigned, j);
++   util_dynarray_append(&b->conflict_list, unsigned, i);
++}
++
++/* Make the register or node "i" intefere with all the other live registers
++ * and nodes.
++ */
++static void add_all_interferences(struct regalloc_ctx *ctx,
++                                  unsigned i,
++                                  BITSET_WORD *live_nodes,
++                                  BITSET_WORD *live_regs)
++{
++   int live_node;
++   BITSET_WORD tmp;
++   BITSET_FOREACH_SET(live_node, tmp, live_nodes, ctx->comp->cur_index) {
++      add_interference(ctx, i,
++                       live_node + ctx->comp->cur_reg);
++   }
++
++   int live_reg;
++   BITSET_FOREACH_SET(live_reg, tmp, ctx->live, ctx->comp->cur_index) {
++      add_interference(ctx, i, live_reg);
++   }
++
++}
++
++static void print_liveness(struct regalloc_ctx *ctx,
++                           BITSET_WORD *live_reg, BITSET_WORD *live_val)
++{
++   if (!(lima_debug & LIMA_DEBUG_GP))
++      return;
++
++   int live_idx;
++   BITSET_WORD tmp;
++   BITSET_FOREACH_SET(live_idx, tmp, live_reg, ctx->comp->cur_reg) {
++      printf("reg%d ", live_idx);
++   }
++   BITSET_FOREACH_SET(live_idx, tmp, live_val, ctx->comp->cur_index) {
++      printf("%d ", live_idx);
++   }
++   printf("\n");
++}
++
++static void calc_interference(struct regalloc_ctx *ctx)
++{
++   BITSET_WORD *live_nodes =
++      rzalloc_array(ctx->mem_ctx, BITSET_WORD, ctx->comp->cur_index);
++
++   list_for_each_entry(gpir_block, block, &ctx->comp->block_list, list) {
++      /* Initialize liveness at the end of the block, but exclude values that
++       * definitely aren't defined by the end. This helps out with
++       * partially-defined registers, like:
++       *
++       * if (condition) {
++       *    foo = ...;
++       * }
++       * if (condition) {
++       *    ... = foo;
++       * }
++       *
++       * If we naively propagated liveness backwards, foo would be live from
++       * the beginning of the program, but if we're not inside a loop then
++       * its value is undefined before the first if and we don't have to
++       * consider it live. Mask out registers like foo here.
++       */
++      for (unsigned i = 0; i < ctx->bitset_words; i++) {
++         ctx->live[i] = block->live_out[i] & block->def_out[i];
++      }
++
++      list_for_each_entry_rev(gpir_node, node, &block->node_list, list) {
++         gpir_debug("processing node %d\n", node->index);
++         print_liveness(ctx, ctx->live, live_nodes);
++         if (node->type != gpir_node_type_store &&
++             node->type != gpir_node_type_branch) {
++            add_all_interferences(ctx, node->index + ctx->comp->cur_reg,
++                                  live_nodes, ctx->live);
++
++            /* KILL */
++            BITSET_CLEAR(live_nodes, node->index);
++         } else if (node->op == gpir_op_store_reg) {
++            gpir_store_node *store = gpir_node_to_store(node);
++            add_all_interferences(ctx, store->reg->index,
++                                  live_nodes, ctx->live);
++
++            /* KILL */
++            BITSET_CLEAR(ctx->live, store->reg->index);
++         }
++
++         /* GEN */
++         if (node->type == gpir_node_type_store) {
++            gpir_store_node *store = gpir_node_to_store(node);
++            BITSET_SET(live_nodes, store->child->index);
++         } else if (node->type == gpir_node_type_alu) {
++            gpir_alu_node *alu = gpir_node_to_alu(node);
++            for (int i = 0; i < alu->num_child; i++)
++               BITSET_SET(live_nodes, alu->children[i]->index);
++         } else if (node->type == gpir_node_type_branch) {
++            gpir_branch_node *branch = gpir_node_to_branch(node);
++            BITSET_SET(live_nodes, branch->cond->index);
++         } else if (node->op == gpir_op_load_reg) {
++            gpir_load_node *load = gpir_node_to_load(node);
++            BITSET_SET(ctx->live, load->reg->index);
++         }
++      }
++   }
++}
++
++/* Register allocation */
++
++static bool can_simplify(struct regalloc_ctx *ctx, unsigned i)
++{
++   struct reg_info *info = &ctx->registers[i];
++   if (i < ctx->comp->cur_reg) {
++      /* Physical regs. */
++      return info->phys_conflicts + info->node_conflicts < GPIR_PHYSICAL_REG_NUM;
++   } else {
++      /* Nodes: if we manage to allocate all of its conflicting physical
++       * registers, they will take up at most GPIR_PHYSICAL_REG_NUM colors, so
++       * we can ignore any more than that.
++       */
++      return MIN2(info->phys_conflicts, GPIR_PHYSICAL_REG_NUM) + 
++         info->node_conflicts < GPIR_PHYSICAL_REG_NUM + GPIR_VALUE_REG_NUM;
++   }
++}
++
++static void push_stack(struct regalloc_ctx *ctx, unsigned i)
++{
++   ctx->stack[ctx->stack_size++] = i;
++   if (i < ctx->comp->cur_reg)
++      gpir_debug("pushing reg%u\n", i);
++   else
++      gpir_debug("pushing %d\n", i - ctx->comp->cur_reg);
++
++   struct reg_info *info = &ctx->registers[i];
++   assert(info->visited);
++
++   util_dynarray_foreach(&info->conflict_list, unsigned, conflict) {
++      struct reg_info *conflict_info = &ctx->registers[*conflict];
++      if (i < ctx->comp->cur_reg) {
++         assert(conflict_info->phys_conflicts > 0);
++         conflict_info->phys_conflicts--;
++      } else {
++         assert(conflict_info->node_conflicts > 0);
++         conflict_info->node_conflicts--;
++      }
++      if (!ctx->registers[*conflict].visited && can_simplify(ctx, *conflict)) {
++         ctx->worklist[ctx->worklist_end++] = *conflict;
++         ctx->registers[*conflict].visited = true;
++      }
++   }
++}
++
++static void do_regalloc(struct regalloc_ctx *ctx)
++{
++   ctx->worklist_start = 0;
++   ctx->worklist_end = 0;
++   ctx->stack_size = 0;
++
++   /* Step 1: find the initially simplifiable registers */
++   for (int i = 0; i < ctx->comp->cur_reg + ctx->comp->cur_index; i++) {
++      if (can_simplify(ctx, i)) {
++         ctx->worklist[ctx->worklist_end++] = i;
++         ctx->registers[i].visited = true;
++      }
++   }
++
++   while (true) {
++      /* Step 2: push onto the stack whatever we can */
++      while (ctx->worklist_start != ctx->worklist_end) {
++         push_stack(ctx, ctx->worklist[ctx->worklist_start++]);
++      }
++
++      if (ctx->stack_size < ctx->num_nodes_and_regs) {
++         /* If there are still unsimplifiable nodes left, we need to
++          * optimistically push a node onto the stack.  Choose the one with
++          * the smallest number of current neighbors, since that's the most
++          * likely to succeed.
++          */
++         unsigned min_conflicts = UINT_MAX;
++         unsigned best_reg = 0;
++         for (unsigned reg = 0; reg < ctx->num_nodes_and_regs; reg++) {
++            struct reg_info *info = &ctx->registers[reg];
++            if (info->visited)
++               continue;
++            if (info->phys_conflicts + info->node_conflicts < min_conflicts) {
++               best_reg = reg;
++               min_conflicts = info->phys_conflicts + info->node_conflicts;
++            }
++         }
++         gpir_debug("optimistic triggered\n");
++         ctx->registers[best_reg].visited = true;
++         push_stack(ctx, best_reg);
++      } else {
++         break;
++      }
++   }
++
++   /* Step 4: pop off the stack and assign colors */
++   for (int i = ctx->num_nodes_and_regs - 1; i >= 0; i--) {
++      unsigned idx = ctx->stack[i];
++      struct reg_info *reg = &ctx->registers[idx];
++
++      unsigned num_available_regs;
++      if (idx < ctx->comp->cur_reg) {
++         num_available_regs = GPIR_PHYSICAL_REG_NUM;
++      } else {
++         num_available_regs = GPIR_VALUE_REG_NUM + GPIR_PHYSICAL_REG_NUM;
++      }
++
++      bool found = false;
++      unsigned start = i % num_available_regs;
++      for (unsigned j = 0; j < num_available_regs; j++) {
++         unsigned candidate = (j + start) % num_available_regs;
++         bool available = true;
++         util_dynarray_foreach(&reg->conflict_list, unsigned, conflict_idx) {
++            struct reg_info *conflict = &ctx->registers[*conflict_idx];
++            if (conflict->assigned_color >= 0 &&
++                conflict->assigned_color == (int) candidate) {
++               available = false;
++               break;
++            }
++         }
++
++         if (available) {
++            reg->assigned_color = candidate;
++            found = true;
+             break;
+          }
+       }
+ 
+-      /* TODO: spill */
+-      assert(i != GPIR_VALUE_REG_NUM + GPIR_PHYSICAL_REG_NUM);
++      /* TODO: spilling */
++      assert(found);
++   }
++}
++
++static void assign_regs(struct regalloc_ctx *ctx)
++{
++   list_for_each_entry(gpir_block, block, &ctx->comp->block_list, list) {
++      list_for_each_entry(gpir_node, node, &block->node_list, list) {
++         if (node->index >= 0) {
++            node->value_reg =
++               ctx->registers[ctx->comp->cur_reg + node->index].assigned_color;
++         }
++
++         if (node->op == gpir_op_load_reg) {
++            gpir_load_node *load = gpir_node_to_load(node);
++            unsigned color = ctx->registers[load->reg->index].assigned_color;
++            load->index = color / 4;
++            load->component = color % 4;
++         }
++
++         if (node->op == gpir_op_store_reg) {
++            gpir_store_node *store = gpir_node_to_store(node);
++            unsigned color = ctx->registers[store->reg->index].assigned_color;
++            store->index = color / 4;
++            store->component = color % 4;
++            node->value_reg = color;
++         }
++      }
++
++      block->live_out_phys = 0;
++
++      int reg_idx;
++      BITSET_WORD tmp;
++      BITSET_FOREACH_SET(reg_idx, tmp, block->live_out, ctx->comp->cur_reg) {
++         if (BITSET_TEST(block->def_out, reg_idx)) {
++            block->live_out_phys |= (1ull << ctx->registers[reg_idx].assigned_color);
++         }
++      }
+    }
+ }
+ 
+@@ -104,6 +465,14 @@ static void regalloc_print_result(gpir_compiler *comp)
+             gpir_node *pred = dep->pred;
+             printf(" %d/%d", pred->index, pred->value_reg);
+          }
++         if (node->op == gpir_op_load_reg) {
++            gpir_load_node *load = gpir_node_to_load(node);
++            printf(" -/%d", 4 * load->index + load->component);
++            printf(" (%d)", load->reg->index);
++         } else if (node->op == gpir_op_store_reg) {
++            gpir_store_node *store = gpir_node_to_store(node);
++            printf(" (%d)", store->reg->index);
++         }
+          printf("\n");
+       }
+       printf("----------------------------\n");
+@@ -112,10 +481,36 @@ static void regalloc_print_result(gpir_compiler *comp)
+ 
+ bool gpir_regalloc_prog(gpir_compiler *comp)
+ {
++   struct regalloc_ctx ctx;
++
++   ctx.mem_ctx = ralloc_context(NULL);
++   ctx.num_nodes_and_regs = comp->cur_reg + comp->cur_index;
++   ctx.bitset_words = BITSET_WORDS(ctx.num_nodes_and_regs);
++   ctx.live = ralloc_array(ctx.mem_ctx, BITSET_WORD, ctx.bitset_words);
++   ctx.worklist = ralloc_array(ctx.mem_ctx, unsigned, ctx.num_nodes_and_regs);
++   ctx.stack = ralloc_array(ctx.mem_ctx, unsigned, ctx.num_nodes_and_regs);
++   ctx.comp = comp;
++
++   ctx.registers = rzalloc_array(ctx.mem_ctx, struct reg_info, ctx.num_nodes_and_regs);
++   for (unsigned i = 0; i < ctx.num_nodes_and_regs; i++) {
++      ctx.registers[i].conflicts = rzalloc_array(ctx.mem_ctx, BITSET_WORD,
++                                                 ctx.bitset_words);
++      util_dynarray_init(&ctx.registers[i].conflict_list, ctx.mem_ctx);
++   }
++
+    list_for_each_entry(gpir_block, block, &comp->block_list, list) {
+-      regalloc_block(block);
++      block->live_out = rzalloc_array(ctx.mem_ctx, BITSET_WORD, ctx.bitset_words);
++      block->live_in = rzalloc_array(ctx.mem_ctx, BITSET_WORD, ctx.bitset_words);
++      block->def_out = rzalloc_array(ctx.mem_ctx, BITSET_WORD, ctx.bitset_words);
+    }
+ 
++   calc_liveness(&ctx);
++   calc_interference(&ctx);
++   do_regalloc(&ctx);
++   assign_regs(&ctx);
++
+    regalloc_print_result(comp);
++   ralloc_free(ctx.mem_ctx);
+    return true;
+ }
++
+diff --git a/src/gallium/drivers/lima/ir/gp/scheduler.c b/src/gallium/drivers/lima/ir/gp/scheduler.c
+index 3b490974fc0..ac132776d43 100644
+--- a/src/gallium/drivers/lima/ir/gp/scheduler.c
++++ b/src/gallium/drivers/lima/ir/gp/scheduler.c
+@@ -215,6 +215,14 @@ typedef struct {
+     * schedule the instruction.
+     */
+    int total_spill_needed;
++
++   /* For each physical register, a linked list of loads associated with it in
++    * this block. When we spill a value to a given register, and there are
++    * existing loads associated with it that haven't been scheduled yet, we
++    * have to make sure that the corresponding unspill happens after the last
++    * original use has happened, i.e. is scheduled before.
++    */
++   struct list_head physreg_reads[GPIR_PHYSICAL_REG_NUM];
+ } sched_ctx;
+ 
+ static int gpir_min_dist_alu(gpir_dep *dep)
+@@ -535,6 +543,19 @@ static bool _try_place_node(sched_ctx *ctx, gpir_instr *instr, gpir_node *node)
+       }
+    }
+ 
++   if (node->op == gpir_op_store_reg) {
++      /* This register may be loaded in the next basic block, in which case
++       * there still needs to be a 2 instruction gap. We do what the blob
++       * seems to do and simply disable stores in the last two instructions of
++       * the basic block.
++       *
++       * TODO: We may be able to do better than this, but we have to check
++       * first if storing a register works across branches.
++       */
++      if (instr->index < 2)
++         return false;
++   }
++
+    node->sched.instr = instr;
+ 
+    int max_node_spill_needed = INT_MAX;
+@@ -1009,10 +1030,6 @@ static bool try_spill_node(sched_ctx *ctx, gpir_node *node)
+ 
+       ctx->live_physregs |= (1ull << physreg);
+ 
+-      /* TODO: when we support multiple basic blocks, there may be register
+-       * loads/stores to this register other than this one that haven't been
+-       * scheduled yet so we may need to insert write-after-read dependencies.
+-       */
+       gpir_store_node *store = gpir_node_create(ctx->block, gpir_op_store_reg);
+       store->index = physreg / 4;
+       store->component = physreg % 4;
+@@ -1030,6 +1047,16 @@ static bool try_spill_node(sched_ctx *ctx, gpir_node *node)
+       }
+       node->sched.physreg_store = store;
+       gpir_node_add_dep(&store->node, node, GPIR_DEP_INPUT);
++
++      list_for_each_entry(gpir_load_node, load,
++                          &ctx->physreg_reads[physreg], reg_link) {
++         gpir_node_add_dep(&store->node, &load->node, GPIR_DEP_WRITE_AFTER_READ);
++         if (load->node.sched.ready) {
++            list_del(&load->node.list);
++            load->node.sched.ready = false;
++         }
++      }
++
+       node->sched.ready = false;
+       schedule_insert_ready_list(ctx, &store->node);
+    }
+@@ -1556,13 +1583,21 @@ static bool schedule_block(gpir_block *block)
+    list_inithead(&ctx.ready_list);
+    ctx.block = block;
+    ctx.ready_list_slots = 0;
+-   /* TODO initialize with block live out once we have proper liveness
+-    * tracking
+-    */
+-   ctx.live_physregs = 0;
++   ctx.live_physregs = block->live_out_phys;
++
++   for (unsigned i = 0; i < GPIR_PHYSICAL_REG_NUM; i++) {
++      list_inithead(&ctx.physreg_reads[i]);
++   }
+ 
+    /* construct the ready list from root nodes */
+    list_for_each_entry_safe(gpir_node, node, &block->node_list, list) {
++      /* Add to physreg_reads */
++      if (node->op == gpir_op_load_reg) {
++         gpir_load_node *load = gpir_node_to_load(node);
++         unsigned index = 4 * load->index + load->component;
++         list_addtail(&load->reg_link, &ctx.physreg_reads[index]);
++      }
++
+       if (gpir_node_is_root(node))
+          schedule_insert_ready_list(&ctx, node);
+    }
+@@ -1623,22 +1658,6 @@ static void schedule_build_dependency(gpir_block *block)
+       }
+    }
+ 
+-   /* Forward dependencies. We only need to add these for register loads,
+-    * since value registers already have an input dependency.
+-    */
+-   list_for_each_entry(gpir_node, node, &block->node_list, list) {
+-      if (node->op == gpir_op_load_reg) {
+-         gpir_load_node *load = gpir_node_to_load(node);
+-         unsigned index = 4 * load->index + load->component;
+-         if (last_written[index]) {
+-            gpir_node_add_dep(node, last_written[index], GPIR_DEP_READ_AFTER_WRITE);
+-         }
+-      }
+-
+-      if (node->value_reg >= 0)
+-         last_written[node->value_reg] = node;
+-   }
+-
+    memset(last_written, 0, sizeof(last_written));
+ 
+    /* False dependencies. For value registers, these exist only to make sure
+@@ -1651,6 +1670,10 @@ static void schedule_build_dependency(gpir_block *block)
+          if (last_written[index]) {
+             gpir_node_add_dep(last_written[index], node, GPIR_DEP_WRITE_AFTER_READ);
+          }
++      } else if (node->op == gpir_op_store_reg) {
++         gpir_store_node *store = gpir_node_to_store(node);
++         unsigned index = 4 * store->index + store->component;
++         last_written[index] = node;
+       } else {
+          add_fake_dep(node, node, last_written);
+       }
+-- 
+2.22.0
+
+
+From 946b7667b313e60247c81bb472b7fdf4f2b68a71 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Wed, 18 Sep 2019 12:29:45 +0700
+Subject: [PATCH 5/7] lima/gpir: Fix postlog2 fixup handling
+
+We guarantee that a complex1 op is always used by postlog2 directly by
+rewriting the postlog2 op to be a move when there would be a move
+inserted between them. But we weren't doing this in all circumstances
+where there might be a move. Move the logic to place_move() so that it
+always happens. Fixes a few log tests that happened to start failing due
+to changes in the register allocator leading to a different scheduling
+order.
+---
+ src/gallium/drivers/lima/ir/gp/scheduler.c | 23 +++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/scheduler.c b/src/gallium/drivers/lima/ir/gp/scheduler.c
+index ac132776d43..e069079591c 100644
+--- a/src/gallium/drivers/lima/ir/gp/scheduler.c
++++ b/src/gallium/drivers/lima/ir/gp/scheduler.c
+@@ -1342,6 +1342,17 @@ static bool try_node(sched_ctx *ctx)
+ 
+ static void place_move(sched_ctx *ctx, gpir_node *node)
+ {
++   /* For complex1 that is consumed by a postlog2, we cannot allow any moves
++    * in between. Convert the postlog2 to a move and insert a new postlog2,
++    * and try to schedule it again in try_node().
++    */
++   gpir_node *postlog2 = consuming_postlog2(node);
++   if (postlog2) {
++      postlog2->op = gpir_op_mov;
++      create_postlog2(ctx, node);
++      return;
++   }
++
+    gpir_node *move = create_move(ctx, node);
+    gpir_node_foreach_succ_safe(move, dep) {
+       gpir_node *succ = dep->succ;
+@@ -1380,17 +1391,7 @@ static bool sched_move(sched_ctx *ctx)
+ {
+    list_for_each_entry(gpir_node, node, &ctx->ready_list, list) {
+       if (node->sched.max_node) {
+-         /* For complex1 that is consumed by a postlog2, we cannot allow any
+-          * moves in between. Convert the postlog2 to a move and insert a new
+-          * postlog2, and try to schedule it again in try_node().
+-          */
+-         gpir_node *postlog2 = consuming_postlog2(node);
+-         if (postlog2) {
+-            postlog2->op = gpir_op_mov;
+-            create_postlog2(ctx, node);
+-         } else {
+-            place_move(ctx, node);
+-         }
++         place_move(ctx, node);
+          return true;
+       }
+    }
+-- 
+2.22.0
+
+
+From a8b4ef8f271bc6ab0a45d3d7176fb32e49b4e501 Mon Sep 17 00:00:00 2001
+From: Connor Abbott <cwabbott0@gmail.com>
+Date: Wed, 18 Sep 2019 18:13:08 +0700
+Subject: [PATCH 6/7] lima/gpir: Don't emit movs when translating from NIR
+
+The scheduler doesn't expect them. To do this, I had to refactor the
+registration part of gpir_node_create_dest() to be separate from
+creating and inserting the node, since the last two now aren't done when
+handling moves. This adds more code but creates the possibility of
+automatically inserting input dependencies when inserting nodes, similar
+to what's done in NIR with the use-def lists (this isn't done yet).
+---
+ src/gallium/drivers/lima/ir/gp/nir.c | 86 ++++++++++++++++------------
+ 1 file changed, 50 insertions(+), 36 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/gp/nir.c b/src/gallium/drivers/lima/ir/gp/nir.c
+index 8d9a5beb98a..e405e1a6c62 100644
+--- a/src/gallium/drivers/lima/ir/gp/nir.c
++++ b/src/gallium/drivers/lima/ir/gp/nir.c
+@@ -49,17 +49,13 @@ static gpir_reg *reg_for_nir_reg(gpir_compiler *comp, nir_register *nir_reg)
+    return reg;
+ }
+ 
+-static inline gpir_node *gpir_node_create_ssa(gpir_block *block, gpir_op op, nir_ssa_def *ssa)
++static void register_node_ssa(gpir_block *block, gpir_node *node, nir_ssa_def *ssa)
+ {
+-   int index = ssa->index;
+-   gpir_node *node = gpir_node_create(block, op);
++   block->comp->node_for_ssa[ssa->index] = node;
++   snprintf(node->name, sizeof(node->name), "ssa%d", ssa->index);
+ 
+-   block->comp->node_for_ssa[index] = node;
+-   snprintf(node->name, sizeof(node->name), "ssa%d", index);
+-   list_addtail(&node->list, &block->node_list);
+-
+-   /* If any uses are outside the current block, we'll need to create a store
+-    * instruction for them.
++   /* If any uses are outside the current block, we'll need to create a
++    * register and store to it.
+     */
+    bool needs_register = false;
+    nir_foreach_use(use, ssa) {
+@@ -87,37 +83,36 @@ static inline gpir_node *gpir_node_create_ssa(gpir_block *block, gpir_op op, nir
+       list_addtail(&store->node.list, &block->node_list);
+       block->comp->reg_for_ssa[ssa->index] = store->reg;
+    }
+-
+-   return node;
+ }
+ 
+-static inline void *gpir_node_create_reg(gpir_block *block, gpir_op op, nir_reg_dest *nir_reg)
++static void register_node_reg(gpir_block *block, gpir_node *node, nir_reg_dest *nir_reg)
+ {
+-   int index = nir_reg->reg->index;
+-   gpir_node *node = gpir_node_create(block, op);
+-   block->comp->node_for_reg[index] = node;
++   block->comp->node_for_reg[nir_reg->reg->index] = node;
+    gpir_store_node *store = gpir_node_create(block, gpir_op_store_reg);
+ 
+-   snprintf(node->name, sizeof(node->name), "reg%d", index);
++   snprintf(node->name, sizeof(node->name), "reg%d", nir_reg->reg->index);
+ 
+    store->child = node;
+    store->reg = reg_for_nir_reg(block->comp, nir_reg->reg);
+    gpir_node_add_dep(&store->node, node, GPIR_DEP_INPUT);
+ 
+-   list_addtail(&node->list, &block->node_list);
+    list_addtail(&store->node.list, &block->node_list);
+-   return node;
+ }
+ 
+-static void *gpir_node_create_dest(gpir_block *block, gpir_op op, nir_dest *dest)
++/* Register the given gpir_node as providing the given NIR destination, so
++ * that gpir_node_find() will return it. Also insert any stores necessary if
++ * the destination will be used after the end of this basic block. The node
++ * must already be inserted.
++ */
++static void register_node(gpir_block *block, gpir_node *node, nir_dest *dest)
+ {
+    if (dest->is_ssa)
+-      return gpir_node_create_ssa(block, op, &dest->ssa);
++      register_node_ssa(block, node, &dest->ssa);
+    else
+-      return gpir_node_create_reg(block, op, &dest->reg);
++      register_node_reg(block, node, &dest->reg);
+ }
+ 
+-static gpir_node *gpir_node_find(gpir_block *block, gpir_node *succ, nir_src *src,
++static gpir_node *gpir_node_find(gpir_block *block, nir_src *src,
+                                  int channel)
+ {
+    gpir_reg *reg = NULL;
+@@ -137,7 +132,7 @@ static gpir_node *gpir_node_find(gpir_block *block, gpir_node *succ, nir_src *sr
+       }
+    } else {
+       pred = block->comp->node_for_reg[src->reg.reg->index];
+-      if (pred && pred->block == block && pred != succ)
++      if (pred && pred->block == block)
+          return pred;
+       reg = reg_for_nir_reg(block->comp, src->reg.reg);
+    }
+@@ -146,7 +141,7 @@ static gpir_node *gpir_node_find(gpir_block *block, gpir_node *succ, nir_src *sr
+    pred = gpir_node_create(block, gpir_op_load_reg);
+    gpir_load_node *load = gpir_node_to_load(pred);
+    load->reg = reg;
+-   list_addtail(&pred->list, &succ->list);
++   list_addtail(&pred->list, &block->node_list);
+ 
+    return pred;
+ }
+@@ -172,12 +167,25 @@ static int nir_to_gpir_opcodes[nir_num_opcodes] = {
+    [nir_op_seq] = gpir_op_eq,
+    [nir_op_sne] = gpir_op_ne,
+    [nir_op_fabs] = gpir_op_abs,
+-   [nir_op_mov] = gpir_op_mov,
+ };
+ 
+ static bool gpir_emit_alu(gpir_block *block, nir_instr *ni)
+ {
+    nir_alu_instr *instr = nir_instr_as_alu(ni);
++
++   /* gpir_op_mov is useless before the final scheduler, and the scheduler
++    * currently doesn't expect us to emit it. Just register the destination of
++    * this instruction with its source. This will also emit any necessary
++    * register loads/stores for things like "r0 = mov ssa_0" or
++    * "ssa_0 = mov r0".
++    */
++   if (instr->op == nir_op_mov) {
++      gpir_node *child = gpir_node_find(block, &instr->src[0].src,
++                                        instr->src[0].swizzle[0]);
++      register_node(block, child, &instr->dest.dest);
++      return true;
++   }
++
+    int op = nir_to_gpir_opcodes[instr->op];
+ 
+    if (op < 0) {
+@@ -185,7 +193,7 @@ static bool gpir_emit_alu(gpir_block *block, nir_instr *ni)
+       return false;
+    }
+ 
+-   gpir_alu_node *node = gpir_node_create_dest(block, op, &instr->dest.dest);
++   gpir_alu_node *node = gpir_node_create(block, op);
+    if (unlikely(!node))
+       return false;
+ 
+@@ -197,24 +205,29 @@ static bool gpir_emit_alu(gpir_block *block, nir_instr *ni)
+       nir_alu_src *src = instr->src + i;
+       node->children_negate[i] = src->negate;
+ 
+-      gpir_node *child = gpir_node_find(block, &node->node, &src->src, src->swizzle[0]);
++      gpir_node *child = gpir_node_find(block, &src->src, src->swizzle[0]);
+       node->children[i] = child;
+ 
+       gpir_node_add_dep(&node->node, child, GPIR_DEP_INPUT);
+    }
+ 
++   list_addtail(&node->node.list, &block->node_list);
++   register_node(block, &node->node, &instr->dest.dest);
++
+    return true;
+ }
+ 
+ static gpir_node *gpir_create_load(gpir_block *block, nir_dest *dest,
+                                    int op, int index, int component)
+ {
+-   gpir_load_node *load = gpir_node_create_dest(block, op, dest);
++   gpir_load_node *load = gpir_node_create(block, op);
+    if (unlikely(!load))
+       return NULL;
+ 
+    load->index = index;
+    load->component = component;
++   list_addtail(&load->node.list, &block->node_list);
++   register_node(block, &load->node, dest);
+    return &load->node;
+ }
+ 
+@@ -266,14 +279,13 @@ static bool gpir_emit_intrinsic(gpir_block *block, nir_instr *ni)
+       gpir_store_node *store = gpir_node_create(block, gpir_op_store_varying);
+       if (unlikely(!store))
+          return false;
+-      list_addtail(&store->node.list, &block->node_list);
+-
++      gpir_node *child = gpir_node_find(block, instr->src, 0);
++      store->child = child;
+       store->index = nir_intrinsic_base(instr);
+       store->component = nir_intrinsic_component(instr);
+ 
+-      gpir_node *child = gpir_node_find(block, &store->node, instr->src, 0);
+-      store->child = child;
+       gpir_node_add_dep(&store->node, child, GPIR_DEP_INPUT);
++      list_addtail(&store->node.list, &block->node_list);
+ 
+       return true;
+    }
+@@ -287,8 +299,7 @@ static bool gpir_emit_intrinsic(gpir_block *block, nir_instr *ni)
+ static bool gpir_emit_load_const(gpir_block *block, nir_instr *ni)
+ {
+    nir_load_const_instr *instr = nir_instr_as_load_const(ni);
+-   gpir_const_node *node =
+-      gpir_node_to_const(gpir_node_create_ssa(block, gpir_op_const, &instr->def));
++   gpir_const_node *node = gpir_node_create(block, gpir_op_const);
+    if (unlikely(!node))
+       return false;
+ 
+@@ -297,6 +308,8 @@ static bool gpir_emit_load_const(gpir_block *block, nir_instr *ni)
+ 
+    node->value.i = instr->value[0].i32;
+ 
++   list_addtail(&node->node.list, &block->node_list);
++   register_node_ssa(block, &node->node, &instr->def);
+    return true;
+ }
+ 
+@@ -362,9 +375,10 @@ static bool gpir_emit_function(gpir_compiler *comp, nir_function_impl *impl)
+       if (block_nir->successors[1] != NULL) {
+          nir_if *nif = nir_cf_node_as_if(nir_cf_node_next(&block_nir->cf_node));
+          gpir_alu_node *cond = gpir_node_create(block, gpir_op_not);
+-         list_addtail(&cond->node.list, &block->node_list);
+-         cond->children[0] = gpir_node_find(block, &cond->node, &nif->condition, 0);
++         cond->children[0] = gpir_node_find(block, &nif->condition, 0);
++
+          gpir_node_add_dep(&cond->node, cond->children[0], GPIR_DEP_INPUT);
++         list_addtail(&cond->node.list, &block->node_list);
+ 
+          gpir_branch_node *branch = gpir_node_create(block, gpir_op_branch_cond);
+          list_addtail(&branch->node.list, &block->node_list);
+-- 
+2.22.0
+
+
+From 8e4f41f0480faf2a7828ef15de14b4d29edccf5a Mon Sep 17 00:00:00 2001
 From: Connor Abbott <cwabbott0@gmail.com>
 Date: Thu, 19 Sep 2019 00:47:28 +0700
-Subject: [PATCH] lima/gpir: Fix 64-bit shift in scheduler spilling
+Subject: [PATCH 7/7] lima/gpir: Fix 64-bit shift in scheduler spilling
 
 There are 64 physical registers so the shift must be 64 bits.
-
 ---
  src/gallium/drivers/lima/ir/gp/scheduler.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
@@ -28,3 +1835,6 @@ index e069079591c..bf8bd63e57c 100644
  
           available &= use_available;
        }
+-- 
+2.22.0
+
