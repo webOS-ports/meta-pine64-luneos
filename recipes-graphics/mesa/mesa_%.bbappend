@@ -11,6 +11,7 @@ SRC_URI_pinephone = " \
     file://0003-meson.build-make-TLS-GLX-optional-again.patch \
     file://0004-lima_screen-add-PIPE_TEXTURE_CUBE.patch \
     file://0007-Support-for-branching.patch \
+    file://0008-Fix-asm-option-compatibility.patch \
 "
 S_pinephone = "${WORKDIR}/git"
 
