@@ -26,5 +26,4 @@ GALLIUMDRIVERS_remove = ",svga"
 # GALLIUMDRIVERS_LLVM_remove = ",svga"
 # GALLIUMDRIVERS_LLVM="r300,svga,nouveau"
 GALLIUMDRIVERS_LLVM = "r300,nouveau"
-FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
