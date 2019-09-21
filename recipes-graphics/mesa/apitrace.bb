@@ -11,7 +11,6 @@ SRC_URI = "git://github.com/apitrace/apitrace.git;protocol=https \
            file://0002-Use-GL-headers-from-sysroot.patch \
            file://0003-Exclude-retrace-from-build.patch \
            file://0004-Fix-APIs-conflicting-definitions.patch \
-           file://0005-Fix-dlsym-reload.patch \
           "
 SRCREV = "6857eccdc4364116c2e4a7817d2dd26ff705f205"
 
