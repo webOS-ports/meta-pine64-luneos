@@ -1,6 +1,6 @@
 # Use even newer mesa for pinephone
 PV_pinephone = "19.0.99+19.1.6-git${SRCPV}"
-SRCREV_pinephone = "fa080f03d3d1c7fdfa6d4e79cccced5e5a09a3a4"
+SRCREV_pinephone = "ab49a0e74671fb13ce72f839403cfc82f76e4217"
 LIC_FILES_CHKSUM_pinephone = "file://docs/license.html;md5=3a4999caf82cc503ac8b9e37c235782e"
 
 FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/${BPN}:"
