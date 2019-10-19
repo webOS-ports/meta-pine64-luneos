@@ -14,11 +14,10 @@ KERNEL_VERSION_SANITY_SKIP="1"
 KBUILD_DEFCONFIG_pinephone = "pinephone_defconfig"
 
 BRANCH = "pine64-kernel"
-SRCREV = "eaba25a67af44141015739fb595e2877f8501690"
+SRCREV = "59d7c1893540d73581cf5679d5dc79cf84668606"
 SRC_URI = " \
           git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
 	  file://0001-dts-touchscreen-fix.patch \
-	  file://drm-do-not-require-DRM_AUTH.patch \
           file://extra.cfg \
 	  "
 
