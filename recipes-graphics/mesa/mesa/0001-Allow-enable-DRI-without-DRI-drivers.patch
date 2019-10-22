@@ -1,4 +1,4 @@
-From f5c856eee466a9ac6fb42a2b4056f82250c44848 Mon Sep 17 00:00:00 2001
+From 52657f512e55f73d5a91fc2d6d7d1986e1aaad1b Mon Sep 17 00:00:00 2001
 From: Andrei Gherzan <andrei@gherzan.ro>
 Date: Wed, 22 May 2019 18:32:07 +0100
 Subject: [PATCH] Allow enable DRI without DRI drivers
@@ -12,7 +12,7 @@ Signed-off-by: Andrei Gherzan <andrei@gherzan.ro>
  2 files changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/meson.build b/meson.build
-index a50f57991da..c56d393a8cf 100644
+index b4cd7999566..f65a6392913 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -154,7 +154,7 @@ with_dri_r200 = dri_drivers.contains('r200')
@@ -25,7 +25,7 @@ index a50f57991da..c56d393a8cf 100644
  gallium_drivers = get_option('gallium-drivers')
  if gallium_drivers.contains('auto')
 diff --git a/meson_options.txt b/meson_options.txt
-index a2f86be19ae..8b6f302f084 100644
+index 3ab2900f929..abbc91f3ef0 100644
 --- a/meson_options.txt
 +++ b/meson_options.txt
 @@ -35,6 +35,12 @@ option(
