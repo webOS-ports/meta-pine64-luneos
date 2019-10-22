@@ -24,6 +24,15 @@ index 09f39d1d3ab3..587babcfa8b9 100644
  		function = "irq";
  	};
  };
+@@ -277,6 +277,8 @@
+ 
+ 		touchscreen-size-x = <720>;
+ 		touchscreen-size-y = <1440>;
++
++		touchscreen-inverted-x;
+ 	};
+ };
+ 
 -- 
 2.17.0
 
