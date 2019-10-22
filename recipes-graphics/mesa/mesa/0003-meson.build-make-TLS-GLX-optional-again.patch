@@ -1,4 +1,4 @@
-From d70790cf05527551c0e39f0cc01d3a5794210212 Mon Sep 17 00:00:00 2001
+From a26047012f374232b900aa4cd4d760d7e81d242a Mon Sep 17 00:00:00 2001
 From: Alexander Kanavin <alex.kanavin@gmail.com>
 Date: Wed, 15 May 2019 17:21:51 +0200
 Subject: [PATCH] meson.build: make TLS GLX optional again
@@ -15,13 +15,13 @@ Signed-off-by: Alexander Kanavin <alex.kanavin@gmail.com>
  2 files changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/meson.build b/meson.build
-index bbfb7e7941b..5fc88b40272 100644
+index db847ad9dc0..cc12f643ff2 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -391,7 +391,9 @@ endif
+@@ -387,7 +387,9 @@ endif
  
  # Android uses emutls for versions <= P/28. For USE_ELF_TLS we need ELF TLS.
- if not with_platform_android or get_option('platform-sdk-version') >= 29
+ if host_machine.system() != 'windows' and (not with_platform_android or get_option('platform-sdk-version') >= 29)
 -  pre_args += '-DUSE_ELF_TLS'
 +  if get_option('glx-tls')
 +    pre_args += '-DUSE_ELF_TLS'
@@ -30,10 +30,10 @@ index bbfb7e7941b..5fc88b40272 100644
  
  if with_glx != 'disabled'
 diff --git a/meson_options.txt b/meson_options.txt
-index 8b6f302f084..df4c3e05244 100644
+index abbc91f3ef0..35786bf5caf 100644
 --- a/meson_options.txt
 +++ b/meson_options.txt
-@@ -366,3 +366,9 @@ option(
+@@ -372,3 +372,9 @@ option(
    value : 25,
    description : 'Android Platform SDK version. Default: Nougat version.'
  )

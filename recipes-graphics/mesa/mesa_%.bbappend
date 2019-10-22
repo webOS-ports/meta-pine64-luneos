@@ -1,6 +1,6 @@
 # Use even newer mesa for pinephone
 PV_pinephone = "19.0.99+19.1.6-git${SRCPV}"
-SRCREV_pinephone = "ab49a0e74671fb13ce72f839403cfc82f76e4217"
+SRCREV_pinephone = "3a71e1d27b041853d5cb5c56c2f143a2e18d476f"
 LIC_FILES_CHKSUM_pinephone = "file://docs/license.html;md5=3a4999caf82cc503ac8b9e37c235782e"
 
 FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/${BPN}:"
@@ -10,12 +10,12 @@ SRC_URI_pinephone = " \
     file://0002-meson.build-check-for-all-linux-host_os-combinations.patch \
     file://0003-meson.build-make-TLS-GLX-optional-again.patch \
     file://0004-lima_screen-add-PIPE_TEXTURE_CUBE.patch \
-    file://0007-Support-for-branching.patch \
     file://0008-Fix-asm-option-compatibility.patch \
 "
 S_pinephone = "${WORKDIR}/git"
 
-EXTRA_OEMESON_append_pinephone = " --buildtype=debug "
+# to debug some issues
+# EXTRA_OEMESON_append_pinephone = " --buildtype=debug "
 
 PACKAGECONFIG[lima] = ""
 PACKAGECONFIG_append_pinephone = " kmsro lima"

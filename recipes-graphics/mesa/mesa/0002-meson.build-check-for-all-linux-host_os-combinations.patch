@@ -1,4 +1,4 @@
-From 2ad74e29b376e51a85df8ac841864346b4af5d35 Mon Sep 17 00:00:00 2001
+From 89987383146c19e13851240b67aa1f0e3ed0acbe Mon Sep 17 00:00:00 2001
 From: Fabio Berton <fabio.berton@ossystems.com.br>
 Date: Wed, 24 Apr 2019 17:01:24 -0300
 Subject: [PATCH] meson.build: check for all linux host_os combinations
@@ -17,14 +17,14 @@ Upstream-Status: Pending
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/meson.build b/meson.build
-index c56d393a8cf..bbfb7e7941b 100644
+index f65a6392913..db847ad9dc0 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -34,6 +34,8 @@ cpp = meson.get_compiler('cpp')
  
  null_dep = dependency('', required : false)
  
-+system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly'].contains(host_machine.system()) or host_machine.system().startswith('linux')
++system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'sunos'].contains(host_machine.system()) or host_machine.system().startswith('linux')
 +
  # Arguments for the preprocessor, put these in a separate array from the C and
  # C++ (cpp in meson terminology) arguments since they need to be added to the
@@ -33,17 +33,17 @@ index c56d393a8cf..bbfb7e7941b 100644
  # Only build shared_glapi if at least one OpenGL API is enabled
  with_shared_glapi = with_shared_glapi and with_any_opengl
  
--system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux'].contains(host_machine.system())
+-system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos'].contains(host_machine.system())
 -
  dri_drivers = get_option('dri-drivers')
  if dri_drivers.contains('auto')
    if system_has_kms_drm
-@@ -868,7 +868,7 @@ if cc.compiles('__uint128_t foo(void) { return 0; }',
+@@ -879,7 +879,7 @@ if cc.compiles('__uint128_t foo(void) { return 0; }',
  endif
  
  # TODO: this is very incomplete
 -if ['linux', 'cygwin', 'gnu', 'gnu/kfreebsd'].contains(host_machine.system())
 +if ['cygwin', 'gnu', 'gnu/kfreebsd'].contains(host_machine.system()) or host_machine.system().startswith('linux')
    pre_args += '-D_GNU_SOURCE'
- endif
- 
+ elif host_machine.system() == 'sunos'
+   pre_args += '-D__EXTENSIONS__'
