@@ -22,9 +22,19 @@ PACKAGECONFIG_append_pinephone = " kmsro lima"
 GALLIUMDRIVERS_append_pinephone = "${@bb.utils.contains('PACKAGECONFIG', 'lima', ',lima', '', d)}"
 
 # git/src/gallium/winsys/svga/drm/vmw_msg.c:87:4: error: output number 4 not directly addressable
-GALLIUMDRIVERS_remove = ",svga"
+GALLIUMDRIVERS_remove_pinephone = ",svga"
 # Unfortunatelly this didn't work:
 # GALLIUMDRIVERS_LLVM_remove = ",svga"
 # GALLIUMDRIVERS_LLVM="r300,svga,nouveau"
-GALLIUMDRIVERS_LLVM = "r300,nouveau"
+GALLIUMDRIVERS_LLVM_pinephone = "r300,nouveau"
 
+# MESA_EGL_NO_X11_HEADERS was renamed to EGL_NO_X11 in:
+# https://github.com/mesa3d/mesa/commit/6202a13b71e18dc31ba7e2f4ea915b67eacc1ddb
+
+#because we cannot rely on the fact that all apps will use pkgconfig,
+#make eglplatform.h independent of MESA_EGL_NO_X11_HEADER
+do_install_append_pinephone() {
+    if ${@bb.utils.contains('PACKAGECONFIG', 'egl', 'true', 'false', d)}; then
+        sed -i -e 's/^#elif defined(__unix__) && defined(EGL_NO_X11)$/#elif defined(__unix__) \&\& defined(EGL_NO_X11) || ${@bb.utils.contains('PACKAGECONFIG', 'x11', '0', '1', d)}/' ${D}${includedir}/EGL/eglplatform.h
+    fi
+}
