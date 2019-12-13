@@ -23,7 +23,7 @@ index 09e3759..a954118 100644
  
  # Android uses emutls for versions <= P/28. For USE_ELF_TLS we need ELF TLS.
 -if host_machine.system() != 'windows' and (not with_platform_android or get_option('platform-sdk-version') >= 29)
-+if (not with_platform_android or get_option('platform-sdk-version') >= 29) and get_option('glx-tls')
++if (not with_platform_android or get_option('platform-sdk-version') >= 29) and get_option('elf-tls')
    pre_args += '-DUSE_ELF_TLS'
  endif
  
@@ -36,7 +36,7 @@ index 626baf3..637ff14 100644
    description : 'Enable direct rendering in GLX and EGL for DRI',
  )
 +option(
-+  'glx-tls',
++  'elf-tls',
 +  type : 'boolean',
 +  value : true,
 +  description : 'Enable TLS support in ELF',
