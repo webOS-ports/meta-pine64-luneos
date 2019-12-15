@@ -18,6 +18,7 @@ SRCREV = "6ecddfc2164e0927e75c232d515225c6b21c71b4"
 SRC_URI = " \
           git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
 	  file://0001-dts-touchscreen-fix.patch \
+	  file://0001-pinephone-dts-invert-X-coordinates.patch \
           file://defconfig \
           file://extra.cfg \
 	  "
