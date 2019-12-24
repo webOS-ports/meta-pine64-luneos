@@ -11,13 +11,14 @@ LINUX_VERSION_EXTENSION = "-pinephone"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 
-KBUILD_DEFCONFIG_pinephone = "pine64_defconfig"
+#KBUILD_DEFCONFIG_pinephone = "pine64_defconfig"
 
 BRANCH = "pine64-kernel-5.4.y"
 SRCREV = "bbcb007bba2c10fa42d1c323585358c3b284bc52"
 SRC_URI = " \
           git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
           file://reversed-disable-gold-linker.patch \
+          file://defconfig \
           file://extra.cfg \
 	  "
 
