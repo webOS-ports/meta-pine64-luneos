@@ -1,17 +1,18 @@
 # Use even newer mesa for pinephone
-PV_pinephone = "19.0.99+19.1.6-git${SRCPV}"
-SRCREV_pinephone = "3a71e1d27b041853d5cb5c56c2f143a2e18d476f"
-LIC_FILES_CHKSUM_pinephone = "file://docs/license.html;md5=3a4999caf82cc503ac8b9e37c235782e"
+PV_pinephone = "19.3.99-git${SRCPV}"
+SRCREV_pinephone = "3de2774dcb85fb2f87ae65a854fc5f25f0f34a91"
 
 FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/${BPN}:"
+LIC_FILES_CHKSUM_pinephone = "file://docs/license.html;md5=3a4999caf82cc503ac8b9e37c235782e"
+
 SRC_URI_pinephone = " \
     git://gitlab.freedesktop.org/mesa/mesa.git;branch=master;protocol=https \
-    file://0001-Allow-enable-DRI-without-DRI-drivers.patch \
-    file://0002-meson.build-check-for-all-linux-host_os-combinations.patch \
-    file://0003-meson.build-make-TLS-GLX-optional-again.patch \
-    file://0004-lima_screen-add-PIPE_TEXTURE_CUBE.patch \
-    file://0008-Fix-asm-option-compatibility.patch \
+    file://0001-meson.build-check-for-all-linux-host_os-combinations.patch \
+    file://0002-meson.build-make-TLS-ELF-optional.patch \
+    file://0003-Allow-enable-DRI-without-DRI-drivers.patch \
+    file://0004-Revert-mesa-Enable-asm-unconditionally-now-that-gen_.patch \
 "
+
 S_pinephone = "${WORKDIR}/git"
 
 # to debug some issues
@@ -20,21 +21,3 @@ S_pinephone = "${WORKDIR}/git"
 PACKAGECONFIG[lima] = ""
 PACKAGECONFIG_append_pinephone = " kmsro lima"
 GALLIUMDRIVERS_append_pinephone = "${@bb.utils.contains('PACKAGECONFIG', 'lima', ',lima', '', d)}"
-
-# git/src/gallium/winsys/svga/drm/vmw_msg.c:87:4: error: output number 4 not directly addressable
-GALLIUMDRIVERS_remove_pinephone = ",svga"
-# Unfortunatelly this didn't work:
-# GALLIUMDRIVERS_LLVM_remove = ",svga"
-# GALLIUMDRIVERS_LLVM="r300,svga,nouveau"
-GALLIUMDRIVERS_LLVM_pinephone = "r300,nouveau"
-
-# MESA_EGL_NO_X11_HEADERS was renamed to EGL_NO_X11 in:
-# https://github.com/mesa3d/mesa/commit/6202a13b71e18dc31ba7e2f4ea915b67eacc1ddb
-
-#because we cannot rely on the fact that all apps will use pkgconfig,
-#make eglplatform.h independent of MESA_EGL_NO_X11_HEADER
-do_install_append_pinephone() {
-    if ${@bb.utils.contains('PACKAGECONFIG', 'egl', 'true', 'false', d)}; then
-        sed -i -e 's/^#elif defined(__unix__) && defined(EGL_NO_X11)$/#elif defined(__unix__) \&\& defined(EGL_NO_X11) || ${@bb.utils.contains('PACKAGECONFIG', 'x11', '0', '1', d)}/' ${D}${includedir}/EGL/eglplatform.h
-    fi
-}
