@@ -2,9 +2,8 @@
 PV_pinephone = "19.3.99-git${SRCPV}"
 SRCREV_pinephone = "3de2774dcb85fb2f87ae65a854fc5f25f0f34a91"
 
-FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/${BPN}:"
-LIC_FILES_CHKSUM_pinephone = "file://docs/license.html;md5=3a4999caf82cc503ac8b9e37c235782e"
-
+# Currently all these patches are provided by oe-core recipe backported
+# from 3.1 Dunfell to meta-webos-ports/meta-luneos-backports-3.1/recipes-graphics/mesa
 SRC_URI_pinephone = " \
     git://gitlab.freedesktop.org/mesa/mesa.git;branch=master;protocol=https \
     file://0001-meson.build-check-for-all-linux-host_os-combinations.patch \
@@ -18,6 +17,4 @@ S_pinephone = "${WORKDIR}/git"
 # to debug some issues
 # EXTRA_OEMESON_append_pinephone = " --buildtype=debug "
 
-PACKAGECONFIG[lima] = ""
 PACKAGECONFIG_append_pinephone = " kmsro lima"
-GALLIUMDRIVERS_append_pinephone = "${@bb.utils.contains('PACKAGECONFIG', 'lima', ',lima', '', d)}"
