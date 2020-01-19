@@ -1,6 +1,6 @@
 # Use even newer mesa for pinephone
 PV_pinephone = "19.3.99-git${SRCPV}"
-SRCREV_pinephone = "3de2774dcb85fb2f87ae65a854fc5f25f0f34a91"
+SRCREV_pinephone = "2ebfc6db16137b16663bf563c32fe1932917b22c"
 
 # Currently all these patches are provided by oe-core recipe backported
 # from 3.1 Dunfell to meta-webos-ports/meta-luneos-backports-3.1/recipes-graphics/mesa
