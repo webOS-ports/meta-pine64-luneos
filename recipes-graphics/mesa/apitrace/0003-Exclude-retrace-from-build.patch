@@ -1,4 +1,4 @@
-From 4fa95896f5dd5aec350128f4f66ec5aaf6c63cef Mon Sep 17 00:00:00 2001
+From 139c1b5a02f0fec4e373712084fed85925066700 Mon Sep 17 00:00:00 2001
 From: Christophe Chapuis <chris.chapuis@gmail.com>
 Date: Tue, 17 Sep 2019 18:13:42 +0000
 Subject: [PATCH] Exclude retrace from build
@@ -11,10 +11,10 @@ Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 9154e1b0..9a18325b 100644
+index 953384aa..e834725b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -575,7 +575,7 @@ add_subdirectory (lib)
+@@ -585,7 +585,7 @@ add_subdirectory (lib)
  add_subdirectory (dispatch)
  add_subdirectory (helpers)
  add_subdirectory (wrappers)
@@ -23,6 +23,3 @@ index 9154e1b0..9a18325b 100644
  
  
  ##############################################################################
--- 
-2.17.0
-

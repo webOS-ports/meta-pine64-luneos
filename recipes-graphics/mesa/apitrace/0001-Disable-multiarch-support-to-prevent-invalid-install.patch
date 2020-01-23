@@ -1,4 +1,4 @@
-From 915330cdef5a9747b95d89f8be44a15f9dec1bcd Mon Sep 17 00:00:00 2001
+From 7ff92df3162fd9562b1d5c63ed6bc755b8781bfc Mon Sep 17 00:00:00 2001
 From: Hiroshi Hatake <cosmo0920.oucc@gmail.com>
 Date: Tue, 19 Jun 2018 16:21:15 +0900
 Subject: [PATCH] Disable multiarch support to prevent invalid installation
@@ -9,10 +9,10 @@ Subject: [PATCH] Disable multiarch support to prevent invalid installation
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 46081e32..02b557ba 100644
+index 19316e60..64516b8b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -421,11 +421,11 @@ endif ()
+@@ -440,11 +440,11 @@ endif ()
  
  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
      # Debian multiarch support
@@ -29,6 +29,3 @@ index 46081e32..02b557ba 100644
  endif()
  
  if (WIN32 OR APPLE)
--- 
-2.11.0
-
