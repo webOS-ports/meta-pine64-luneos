@@ -1,4 +1,4 @@
-From a3cbf6a862623dd38b79ef9f14915cf53477b4b3 Mon Sep 17 00:00:00 2001
+From c1239cbfcdfd3c4d0aff577d44f3ed5f5a010911 Mon Sep 17 00:00:00 2001
 From: Christophe Chapuis <chris.chapuis@gmail.com>
 Date: Tue, 17 Sep 2019 18:11:22 +0000
 Subject: [PATCH] Use GL headers from sysroot
@@ -11,10 +11,10 @@ Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6ea99cd2..9154e1b0 100644
+index 64516b8b..953384aa 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -544,7 +544,7 @@ set (MD5_LIBRARIES md5_bundled)
+@@ -554,7 +554,7 @@ set (MD5_LIBRARIES md5_bundled)
  # OpenGL and OpenGL ES at build time, because the OpenGL and OpenGL ES 1 APIs
  # are so intertwined that conditional compilation extremely difficult. This
  # also avoids missing/inconsistent declarations in system headers.
@@ -23,6 +23,3 @@ index 6ea99cd2..9154e1b0 100644
  
  # We use non-standard C++ flags, so we can't just use GTest's CMakeLists.txt
  add_definitions (-DGTEST_HAS_TR1_TUPLE=0)
--- 
-2.17.0
-

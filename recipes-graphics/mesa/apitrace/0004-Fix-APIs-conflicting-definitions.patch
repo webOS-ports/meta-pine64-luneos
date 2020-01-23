@@ -1,15 +1,21 @@
-From 8ce520c6c935551ef13e045981b18c985e86c1f6 Mon Sep 17 00:00:00 2001
+From a7631e083a56ce5948855061f95ffcccc6718683 Mon Sep 17 00:00:00 2001
 From: Christophe Chapuis <chris.chapuis@gmail.com>
 Date: Tue, 17 Sep 2019 18:34:18 +0000
 Subject: [PATCH] Fix APIs conflicting definitions
 
+glapi.py was already updated in upstream commit:
+
+commit a737f865afb7290ba74cc5d7ac888dd3c0eeaf13
+Author: Jose Fonseca <jfonseca@vmware.com>
+Date:   Sun Nov 24 21:27:09 2019 +0000
+
+    khronos: Update headers.
 ---
  specs/eglapi.py | 5 ++++-
- specs/glapi.py  | 6 +++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/specs/eglapi.py b/specs/eglapi.py
-index f0853e0e..b4c23640 100644
+index 786ba05a..c6d3c17a 100644
 --- a/specs/eglapi.py
 +++ b/specs/eglapi.py
 @@ -211,6 +211,9 @@ EGLPlatformDisplayAttribsEXT = EGLIntArray([
@@ -31,23 +37,3 @@ index f0853e0e..b4c23640 100644
  
      # EGL_EXT_platform_base
      GlFunction(EGLDisplay, "eglGetPlatformDisplayEXT", [(EGLenum, "platform"), (OpaquePointer(Void), "native_display"), (EGLPlatformDisplayAttribsEXT, "attrib_list")]),
-diff --git a/specs/glapi.py b/specs/glapi.py
-index d50bb6a7..74fcfcb4 100644
---- a/specs/glapi.py
-+++ b/specs/glapi.py
-@@ -1286,9 +1286,9 @@ glapi.addFunctions([
-     GlFunction(Void, "glProgramUniform3ui64vARB", [(GLprogram, "program"), (GLlocation, "location"), (GLsizei, "count"), (Array(Const(GLuint64), "count*3"), "value")]),
-     GlFunction(Void, "glProgramUniform4ui64vARB", [(GLprogram, "program"), (GLlocation, "location"), (GLsizei, "count"), (Array(Const(GLuint64), "count*4"), "value")]),
- 
--    # GL_ARB_indirect_parameters
--    GlFunction(Void, "glMultiDrawArraysIndirectCountARB", [(GLenum_mode, "mode"), (GLintptr, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
--    GlFunction(Void, "glMultiDrawElementsIndirectCountARB", [(GLenum_mode, "mode"), (GLenum, "type"), (GLintptr, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
-+    # GL_ARB_indirect_parameters 
-+    GlFunction(Void, "glMultiDrawArraysIndirectCountARB", [(GLenum_mode, "mode"), (GLpointerConst, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
-+    GlFunction(Void, "glMultiDrawElementsIndirectCountARB", [(GLenum_mode, "mode"), (GLenum, "type"), (GLpointerConst, "indirect"), (GLintptr, "drawcount"), (GLsizei, "maxdrawcount"), (GLsizei, "stride")]),
- 
-     # GL_ARB_instanced_arrays
-     GlFunction(Void, "glVertexAttribDivisorARB", [(GLuint, "index"), (GLuint, "divisor")]),
--- 
-2.17.0
-
