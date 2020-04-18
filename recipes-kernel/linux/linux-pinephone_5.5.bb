@@ -14,10 +14,11 @@ KERNEL_VERSION_SANITY_SKIP="1"
 #KBUILD_DEFCONFIG_pinephone = "pine64_defconfig"
 
 BRANCH = "pine64-kernel-5.5.y"
-SRCREV = "ad586991931e6a339806f505f76ea25729921dd7"
+SRCREV = "94cf851f0f4443c771a926102dee497def319b49"
 SRC_URI = " \
           git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
           file://reversed-disable-gold-linker.patch \
+	  file://rtl8723cs-disable-power-save.patch \
           file://defconfig \
           file://extra.cfg \
 	  "
