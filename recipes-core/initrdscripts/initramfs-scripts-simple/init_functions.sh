@@ -106,36 +106,47 @@ setup_usb_network_configfs() {
 	CONFIGFS=/config/usb_gadget
 	[ -e "$CONFIGFS" ] || return
 
-	# Create new gadget module template
-	mkdir $CONFIGFS/g1
-	# Congifure vendor and product IDs
-	printf "%s" "0x18D1" >"$CONFIGFS/g1/idVendor"
-	printf "%s" "0xD001" >"$CONFIGFS/g1/idProduct"
+	mkdir -p $CONFIGFS/g1
 
-	# Setup english strings
-	mkdir $CONFIGFS/g1/strings/0x409
-	echo "0123456789" > $CONFIGFS/g1/strings/0x409/serialnumber
-	echo "LuneOS" > $CONFIGFS/g1/strings/0x409/manufacturer
-	echo "LuneOS device" > $CONFIGFS/g1/strings/0x409/product
+	echo 0x1d6b > $CONFIGFS/g1/idVendor # Linux Foundation
+	echo 0x0104 > $CONFIGFS/g1/idProduct # Multifunction Composite Gadget
+	echo 0x0100 > $CONFIGFS/g1/bcdDevice # v1.0.0
+	echo 0x0200 > $CONFIGFS/g1/bcdUSB # USB2
 
-	# Create function instances
-	#mkdir $CONFIGFS/g1/functions/ffs.adb
-	#mkdir $CONFIGFS/g1/functions/ffs.mtp
-	mkdir $CONFIGFS/g1/functions/ecm.usb0
-	echo "FA:75:7F:BB:F4:E6" > $CONFIGFS/g1/functions/ecm.usb0/host_addr
+	mkdir -p $CONFIGFS/g1/strings/0x409
+	echo "fedcba9876543210" > $CONFIGFS/g1/strings/0x409/serialnumber
+	echo "LuneOS" > $CONFIGFS/g1/strings/0x409/manufacturer 
+	echo "LuneOS Device" > $CONFIGFS/g1/strings/0x409/product 
 
-	# Create configuration instance
-	mkdir $CONFIGFS/g1/configs/c.1
-	mkdir $CONFIGFS/g1/configs/c.1/strings/0x409
-	echo "120" > $CONFIGFS/g1/configs/c.1/MaxPower
-	printf "%s" "rndis" > $CONFIGFS/g1/configs/c.1/strings/0x409/configuration
+	N="usb0"
+	mkdir -p $CONFIGFS/g1/functions/ecm.$N
 
-	# Bind function instances and their configuration
-	# NOTE: binding ffs currently doesn't work and will disable ECM...
-	#ln -s $CONFIGFS/g1/functions/ffs.adb $CONFIGFS/g1/configs/c.1
-	#ln -s $CONFIGFS/g1/functions/ffs.mtp $CONFIGFS/g1/configs/c.1
-	ln -s $CONFIGFS/g1/functions/ecm.usb0 $CONFIGFS/g1/configs/c.1
+	# first byte of address must be even
+	HOST="FA:75:7F:BB:F4:E6" # "HostPC"
+	echo $HOST > $CONFIGFS/g1/functions/ecm.$N/host_addr
 
+	C=1
+	mkdir -p $CONFIGFS/g1/configs/c.$C/strings/0x409
+	echo "Config $C: ECM network" > $CONFIGFS/g1/configs/c.$C/strings/0x409/configuration 
+	echo 250 > $CONFIGFS/g1/configs/c.$C/MaxPower 
+	ln -s $CONFIGFS/g1/functions/ecm.$N          $CONFIGFS/g1/configs/c.$C/
+
+    if grep -q bootmode=recovery /proc/cmdline; then
+		# recovery mode: expose sdcard
+		FILE=/dev/mmcblk0
+		
+		mkdir -p $CONFIGFS/g1/functions/mass_storage.$N
+
+		echo 1 > $CONFIGFS/g1/functions/mass_storage.$N/stall
+		echo 0 > $CONFIGFS/g1/functions/mass_storage.$N/lun.0/cdrom
+		echo 0 > $CONFIGFS/g1/functions/mass_storage.$N/lun.0/ro
+		echo 0 > $CONFIGFS/g1/functions/mass_storage.$N/lun.0/nofua
+		echo $FILE > $CONFIGFS/g1/functions/mass_storage.$N/lun.0/file
+
+		ln -s $CONFIGFS/g1/functions/mass_storage.$N $CONFIGFS/g1/configs/c.$C/
+    fi
+
+	# this lists available UDC drivers
 	echo "$(ls /sys/class/udc)" > $CONFIGFS/g1/UDC
 }
 
