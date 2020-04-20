@@ -1,6 +1,9 @@
 FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/files:"
 
-SRC_URI_append_pinephone = " file://boot.txt"
+SRC_URI_append_pinephone = " \
+    file://boot.txt \
+    file://0001-pinephone-Add-volume_key-environment-variable.patch \
+"
 
 DEPENDS_append_pinephone = " arm-trusted-firmware u-boot-tools-native"
 
