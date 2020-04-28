@@ -4,7 +4,7 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
 
 IMAGE_INSTALL = "busybox base-passwd bash"
-IMAGE_INSTALL += "initramfs-scripts-simple"
+IMAGE_INSTALL += "initramfs-scripts-simple luneos-recovery-ui"
 IMAGE_FEATURES = ""
 IMAGE_ROOTFS_SIZE = "8192"
 IMAGE_ROOTFS_EXTRA_SPACE = "0"
