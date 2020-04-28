@@ -28,7 +28,8 @@ EOF
     start_telnetd 172.16.42.2
     
     # start... a shell ? a nice UI ?
-    sh
+    /usr/bin/luneos_recovery_ui || sh
+   
 else
     # mount partition labeled "luneos-rootfs"
     mount_root_partition "luneos-rootfs" "/rfs"
