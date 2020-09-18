@@ -1,8 +1,11 @@
 FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/files:"
 
-SRC_URI_append_pinephone = " \
+LIC_FILES_CHKSUM_pinephone = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
+
+SRCREV_pinephone = "495f85a398272e6d8ea8142790158afa1bb29c77"
+SRC_URI_pinephone = " \
+    git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
     file://boot.txt \
-    file://0001-pinephone-Add-volume_key-environment-variable.patch \
 "
 
 DEPENDS_append_pinephone = " arm-trusted-firmware u-boot-tools-native"

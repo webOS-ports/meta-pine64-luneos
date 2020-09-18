@@ -44,7 +44,7 @@ mount_proc_sys_dev_configfs() {
 	mount -t proc -o nodev,noexec,nosuid proc $1/proc
 	mount -t sysfs -o nodev,noexec,nosuid sysfs $1/sys
 	
-	mkdir $1/config
+	mkdir -p $1/config
 	mount -t configfs -o nodev,noexec,nosuid configfs $1/config
 }
 
