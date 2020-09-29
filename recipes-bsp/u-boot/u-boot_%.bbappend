@@ -8,18 +8,24 @@ SRC_URI_pinephone = " \
     file://boot.txt \
 "
 
-DEPENDS_append_pinephone = " arm-trusted-firmware u-boot-tools-native"
+DEPENDS_append_pinephone = " arm-trusted-firmware crust-firmware u-boot-tools-native"
 
-EXTRA_DEP_pinephone = "arm-trusted-firmware:do_deploy"
+EXTRA_DEP_pinephone = "arm-trusted-firmware:do_deploy crust-firmware:do_deploy"
 EXTRA_DEP = ""
 
 do_configure[depends] += "${EXTRA_DEP}"
 
 do_configure_prepend_pinephone() {
+    # Insert the ATF binary
     if [ ! -f ${B}/bl31.bin ]; then
         ln ${DEPLOY_DIR}/images/${MACHINE}/bl31-${MACHINE}.bin ${B}/bl31.bin
     fi
 
+    # Insert the Crust binary
+    if [ ! -f ${B}/scp.bin ]; then
+        ln ${DEPLOY_DIR}/images/${MACHINE}/scp-${MACHINE}.bin ${B}/scp.bin
+    fi
+    
     mkimage -A arm -O linux -T script -C none -n "U-Boot boot script" \
         -d ${WORKDIR}/boot.txt ${WORKDIR}/boot.scr
 }
