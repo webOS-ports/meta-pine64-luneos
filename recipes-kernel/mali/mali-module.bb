@@ -11,7 +11,7 @@ PV = "1.0.0+git${SRCPV}"
 SRCREV = "f736708fb8ad4f244778324009fc703e91487d37"
 
 SRC_URI = "git://github.com/mripard/sunxi-mali.git"
-S = "${WORKDIR}/git/r6p2/src/devicedrv/mali/"
+S = "${WORKDIR}/git/r6p2/src/devicedrv/mali"
 
 EXTRA_OEMAKE += "KDIR=${STAGING_KERNEL_BUILDDIR} USING_UMP=0 BUILD=release USING_PROFILING=0 MALI_PLATFORM=sunxi USING_DVFS=1 USING_DEVFREQ=1"
 MODULES_INSTALL_TARGET = "install"
