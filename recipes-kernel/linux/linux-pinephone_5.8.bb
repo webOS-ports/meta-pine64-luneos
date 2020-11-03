@@ -16,10 +16,10 @@ KERNEL_VERSION_SANITY_SKIP="1"
 BRANCH = "pine64-kernel-5.8.y"
 SRCREV = "e1c26b7bd643515d3be20268cd2385df2388f8b9"
 SRC_URI = " \
-          git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
-          file://reversed-disable-gold-linker.patch \
-          file://defconfig \
-          file://extra.cfg \
-	  "
+    git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
+    file://0001-arm64-module-set-trampoline-section-flags-regardless.patch \
+    file://defconfig \
+    file://extra.cfg \
+"
 
 COMPATIBLE_MACHINE = "pinephone"
