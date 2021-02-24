@@ -1,6 +1,7 @@
-DESCRIPTION = "Starting EG25 WWAN module"
-LICENSE = "GPL-2.0"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0;md5=801f80980d171dd6425610833a22dbe6"
+SUMMARY = "Quectel EG25 management daemon"
+
+LICENSE = "GPL-3.0"
+LIC_FILES_CHKSUM = "file://COPYING;md5=d32239bcb673463ab874e80d47fae504"
 
 DEPENDS = "glib-2.0 libgpiod libgudev libusb glib-2.0-native"
 RDEPENDS_${PN} = "atinout"
