@@ -10,7 +10,7 @@ DEPENDS = "flex-native bison-native"
 BRANCH = "master"
 SRCREV ?= "e63106c70bc4ddfa3575e4f1f3667de0795252a8"
 SRC_URI = "git://github.com/crust-firmware/crust.git;protocol=git;branch=${BRANCH} \
-           https://musl.cc/or1k-linux-musl-cross.tgz \
+           http://build.webos-ports.org/mainline-kernel-firmwares/or1k-linux-musl-cross.tgz \
 "
 
 S = "${WORKDIR}/git"
