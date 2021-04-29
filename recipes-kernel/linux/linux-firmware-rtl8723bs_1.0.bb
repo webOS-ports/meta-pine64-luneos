@@ -7,15 +7,15 @@ COMPATIBLE_MACHINE = "pinephone"
 RDEPENDS_${PN} = "wireless-regdb"
 
 SRCREV = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
+SRCREV_megous = "4ec2645b007ba4c3f2962e38b50c06f274abbf7c"
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_nic.bin?id=${SRCREV};downloadfilename=rtl8723bs_nic.bin;name=rtl8723bs_nic \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_bt.bin?id=${SRCREV};downloadfilename=rtl8723bs_bt.bin;name=rtl8723bs_bt \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtl_bt/rtl8723bs_fw.bin?id=${SRCREV};downloadfilename=rtl8723bs_fw.bin;name=rtl8723bs_fw \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtl_bt/rtl8723bs_config-OBDA8723.bin?id=${SRCREV};downloadfilename=rtl8723bs_config-OBDA8723.bin;name=rtl8723bs_config \
-    https://github.com/anarsoul/rtl8723bt-firmware/raw/fdde4113c2d0c5e89c3941c6fd03c13eeee40f78/rtl_bt/rtl8723cs_xx_fw.bin;downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
-    https://github.com/anarsoul/rtl8723bt-firmware/raw/fdde4113c2d0c5e89c3941c6fd03c13eeee40f78/rtl_bt/rtl8723cs_xx_config-pinebook.bin;downloadfilename=rtl8723cs_xx_config-pinebook.bin;name=rtl8723cs_xx_config \
+    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_fw.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
+    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_config-pinephone.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_config-pinephone.bin;name=rtl8723cs_xx_config \
+    https://megous.com/git/linux-firmware/plain/ov5640_af.bin?id=${SRCREV_megous};downloadfilename=ov5640_af.bin;name=ov5640_af \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE \
 "
 SRC_URI[rtl8723bs_ap_wowlan.md5sum] = "30240ec2230370617b3704cc2ed5895d"
@@ -26,14 +26,12 @@ SRC_URI[rtl8723bs_nic.md5sum] = "67d4aad0db155a701610b156473a75fd"
 SRC_URI[rtl8723bs_nic.sha256sum] = "a52b5a7be4841b4b2839eddf5122b3300a3610866abe4bb3c3c9e444c8ab7969"
 SRC_URI[rtl8723bs_bt.md5sum] = "f51dc85272c72353fb69f0d379dbd15a"
 SRC_URI[rtl8723bs_bt.sha256sum] = "774f6628ae2cd7d6d8563cbf88f67f9a95e895cb44b55fb26ffdf895fdf26aea"
-SRC_URI[rtl8723bs_fw.md5sum] = "521d95f75577c49eae09b00704c3823d"
-SRC_URI[rtl8723bs_fw.sha256sum] = "580b240cac28ff0f47bcbf5e32c1ada9c82541707732d4d78a6bce6540a9c2b3"
-SRC_URI[rtl8723bs_config.md5sum] = "57b61c775a51f7a4596950ded7d2d4c0"
-SRC_URI[rtl8723bs_config.sha256sum] = "a6319ce368257b45820fcf11f8821b6eea7ddcc649f59a282498bf7a33210103"
 SRC_URI[rtl8723cs_xx_fw.md5sum] = "d51efca9486c57d08a3b5be408e633b9"
 SRC_URI[rtl8723cs_xx_fw.sha256sum] = "c68091565d90c29735bedf72d0bf6590c186ab802ef4fef4caa66ef5af25b870"
 SRC_URI[rtl8723cs_xx_config.md5sum] = "2344554fed8337eb1d3e7bc10e9b307f"
 SRC_URI[rtl8723cs_xx_config.sha256sum] = "492531d5a0a44ed5d0e174476543735eafe2cacc5ff5ce9e8e10092d303b563c"
+SRC_URI[ov5640_af.md5sum] = "7c381ff7c0238d2510c9662b3310dd61"
+SRC_URI[ov5640_af.sha256sum] = "439245623bc99f3b0d8c44d47baed3cc17cad01b9191509c89bb8d92a98949c9"
 SRC_URI[LICENSE.md5sum] = "00d06cfd3eddd5a2698948ead2ad54a5"
 SRC_URI[LICENSE.sha256sum] = "a61351665b4f264f6c631364f85b907d8f8f41f8b369533ef4021765f9f3b62e"
 
@@ -51,10 +49,8 @@ do_install() {
     install -m 0644 ${WORKDIR}/rtl8723bs_bt.bin ${D}/lib/firmware/rtlwifi/rtl8723bs_bt.bin
     install -m 0644 ${WORKDIR}/rtl8723bs_wowlan.bin ${D}/lib/firmware/rtlwifi/rtl8723bs_wowlan.bin
     install -d ${D}/lib/firmware/rtl_bt/
-    install -m 0644 ${WORKDIR}/rtl8723bs_fw.bin ${D}/lib/firmware/rtl_bt/rtl8723bs_fw.bin
-    install -m 0644 ${WORKDIR}/rtl8723bs_config-OBDA8723.bin ${D}/lib/firmware/rtl_bt/rtl8723bs_config-pine64.bin
     install -m 0644 ${WORKDIR}/rtl8723cs_xx_fw.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_fw.bin
-    install -m 0644 ${WORKDIR}/rtl8723cs_xx_config-pinebook.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_config-pinebook.bin
+    install -m 0644 ${WORKDIR}/rtl8723cs_xx_config-pinephone.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_config-pinephone.bin
 }
 
 FILES_${PN} = "/lib/firmware"
