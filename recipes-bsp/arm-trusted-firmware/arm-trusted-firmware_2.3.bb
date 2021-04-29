@@ -8,7 +8,7 @@ inherit deploy
 PROVIDES = "virtual/arm-trusted-firmware"
 
 BRANCH = "master"
-SRCREV ?= "8ff55a9e14a23d7c7f89f52465bcc6307850aa33"
+SRCREV ?= "38b7c9c651c304bed9eea47905fc3072fb2af24e"
 SRC_URI = "git://github.com/ARM-software/arm-trusted-firmware.git;protocol=git;branch=${BRANCH}"
 
 S = "${WORKDIR}/git"

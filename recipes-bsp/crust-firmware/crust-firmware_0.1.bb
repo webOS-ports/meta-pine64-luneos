@@ -1,14 +1,14 @@
 SUMMARY = "Crust Firmware"
 DESCRIPTION = "Crust Libre SCP firmware for Allwinner sunxi SoCs."
 LICENSE = "BSD-1-Clause & BSD-3-Clause & GPLv2 & MIT"
-LIC_FILES_CHKSUM = 'file://LICENSE.md;md5=ef8480c8f81934ffe7a6fdadd085c012'
+LIC_FILES_CHKSUM = 'file://LICENSE.md;md5=ce7d78bbe29bbf107647692966b8209b'
 
 inherit deploy
 
 DEPENDS = "flex-native bison-native"
 
 BRANCH = "master"
-SRCREV ?= "e63106c70bc4ddfa3575e4f1f3667de0795252a8"
+SRCREV ?= "23d6d7b4fbb5375845d96f622e82435064343098"
 SRC_URI = "git://github.com/crust-firmware/crust.git;protocol=git;branch=${BRANCH} \
            http://build.webos-ports.org/mainline-kernel-firmwares/or1k-linux-musl-cross.tgz \
 "

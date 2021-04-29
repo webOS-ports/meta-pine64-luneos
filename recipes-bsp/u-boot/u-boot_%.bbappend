@@ -2,13 +2,14 @@ FILESEXTRAPATHS_prepend_pinephone := "${THISDIR}/files:"
 
 LIC_FILES_CHKSUM_pinephone = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 
-SRCREV_pinephone = "495f85a398272e6d8ea8142790158afa1bb29c77"
+SRCREV_pinephone = "c784be467aa7d111f149c2a54557e8828bc5775a"
 SRC_URI_pinephone = " \
     git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
+    file://0001-sunxi-h3-Fix-PLL1-setup-to-never-use-dividers.patch \
     file://boot.txt \
 "
 
-DEPENDS_append_pinephone = " arm-trusted-firmware crust-firmware u-boot-tools-native"
+DEPENDS_append_pinephone = " arm-trusted-firmware crust-firmware u-boot-tools-native python3-setuptools-native"
 
 EXTRA_DEP_pinephone = "arm-trusted-firmware:do_deploy crust-firmware:do_deploy"
 EXTRA_DEP = ""

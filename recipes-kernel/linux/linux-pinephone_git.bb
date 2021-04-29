@@ -6,18 +6,17 @@ LIC_FILES_CHKSUM = "file://${S}/COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 inherit kernel
 require recipes-kernel/linux/linux-yocto.inc
 
-LINUX_VERSION ?= "5.8"
+LINUX_VERSION ?= "5.12"
 LINUX_VERSION_EXTENSION = "-pinephone"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 
-#KBUILD_DEFCONFIG_pinephone = "pine64_defconfig"
+# KBUILD_DEFCONFIG_pinephone = "pinephone_defconfig"
 
-BRANCH = "pine64-kernel-5.8.y"
-SRCREV = "e1c26b7bd643515d3be20268cd2385df2388f8b9"
+BRANCH = "orange-pi-5.12"
+SRCREV = "4b9f3342ecc64267d472fd555e93595e5bd33ae4"
 SRC_URI = " \
-    git://gitlab.com/pine64-org/linux.git;protocol=https;branch=${BRANCH} \
-    file://0001-arm64-module-set-trampoline-section-flags-regardless.patch \
+    git://github.com/megous/linux;protocol=https;branch=${BRANCH} \
     file://defconfig \
     file://extra.cfg \
 "
