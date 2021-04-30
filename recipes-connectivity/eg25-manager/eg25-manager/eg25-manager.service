@@ -4,11 +4,9 @@ Requires=dbus.service
 Before=ofono.service
 
 [Service]
-Type=oneshot
+Type=simple
 User=root
-ExecStart=/sbin/eg25-manager.sh start
-ExecStop=/sbin/eg25-manager.sh stop
-RemainAfterExit=yes
+ExecStart=/usr/bin/eg25manager
 
 [Install]
 WantedBy=multi-user.target
