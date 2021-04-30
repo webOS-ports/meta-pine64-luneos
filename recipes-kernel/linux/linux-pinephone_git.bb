@@ -17,6 +17,8 @@ BRANCH = "orange-pi-5.12"
 SRCREV = "4b9f3342ecc64267d472fd555e93595e5bd33ae4"
 SRC_URI = " \
     git://github.com/megous/linux;protocol=https;branch=${BRANCH} \
+    file://0001-dts-pinephone-drop-modem-power-node.patch \
+    file://0002-dts-pinephone-jack-detection.patch \
     file://defconfig \
     file://extra.cfg \
 "
