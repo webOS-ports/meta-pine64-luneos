@@ -2,7 +2,7 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
 PACKAGE_ARCH_pinephone = "${MACHINE_ARCH}"
 
-RDEPENDS_${PN}_append_pinephone = "eg25-manager"
+RDEPENDS_${PN}_append_pinephone = " eg25-manager"
 
 SRC_URI_append_pinephone = " file://10-pinephone-proximity.rules \
                              file://90-modem-eg25.rules \
