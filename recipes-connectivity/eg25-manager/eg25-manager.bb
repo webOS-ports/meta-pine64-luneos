@@ -11,12 +11,11 @@ inherit systemd
 
 PV = "0.2.1+git${SRCPV}"
 
-SRCREV = "40136c2a520d3be681aac4201a0e8ef324616140"
+SRCREV = "f2593b62b10513f94039d5c9ba995905b23e7eb4"
 SRC_URI = " \
     git://gitlab.com/mobian1/devices/eg25-manager.git;protocol=https;branch=master \
     file://0001-Fix-udev-dir-for-LuneOS.patch \
     file://0002-Add-VoLTE-configuration.patch \
-    file://0003-src-meson.build-add-dependency-on-gdbofono_src.patch \
     file://eg25-manager.service \
 "
 S = "${WORKDIR}/git"
