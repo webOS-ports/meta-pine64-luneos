@@ -11,7 +11,7 @@ LINUX_VERSION_EXTENSION = "-pinephone"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 
-# KBUILD_DEFCONFIG_pinephone = "pinephone_defconfig"
+# KBUILD_DEFCONFIG:pinephone = "pinephone_defconfig"
 
 BRANCH = "orange-pi-5.12"
 SRCREV = "4b9f3342ecc64267d472fd555e93595e5bd33ae4"

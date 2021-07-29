@@ -4,7 +4,7 @@ LIC_FILES_CHKSUM = "file://LICENCE.rtlwifi_firmware.txt;md5=00d06cfd3eddd5a26989
 
 COMPATIBLE_MACHINE = "pinephone"
 
-RDEPENDS_${PN} = "wireless-regdb"
+RDEPENDS:${PN} = "wireless-regdb"
 
 SRCREV = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
 SRCREV_megous = "4ec2645b007ba4c3f2962e38b50c06f274abbf7c"
@@ -53,5 +53,5 @@ do_install() {
     install -m 0644 ${WORKDIR}/rtl8723cs_xx_config-pinephone.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_config-pinephone.bin
 }
 
-FILES_${PN} = "/lib/firmware"
+FILES:${PN} = "/lib/firmware"
 

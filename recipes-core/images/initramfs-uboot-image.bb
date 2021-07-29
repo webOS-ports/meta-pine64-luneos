@@ -11,8 +11,8 @@ IMAGE_ROOTFS_EXTRA_SPACE = "0"
 export IMAGE_BASENAME = "initramfs-uboot-image"
 IMAGE_LINGUAS = ""
 
-IMAGE_FSTYPES_forcevariable = "cpio.gz.u-boot"
-IMAGE_FSTYPES_forcevariable_pinephone = "cpio.gz.u-boot"
+IMAGE_FSTYPES:forcevariable = "cpio.gz.u-boot"
+IMAGE_FSTYPES:forcevariable:pinephone = "cpio.gz.u-boot"
 
 # We don't need depmod data here
 KERNELDEPMODDEPEND = ""
