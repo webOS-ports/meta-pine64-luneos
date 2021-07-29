@@ -5,4 +5,4 @@
 # qtdeclarative's /usr/include/qt5/QtQuick/qsgtexture.h:59
 # see http://lists.openembedded.org/pipermail/openembedded-core/2015-June/106351.html
 # for details
-CXXFLAGS_append_pinephone = " -DEGL_NO_X11=1 "
+CXXFLAGS:append:pinephone = " -DEGL_NO_X11=1 "

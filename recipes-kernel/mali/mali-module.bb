@@ -16,13 +16,13 @@ S = "${WORKDIR}/git/r6p2/src/devicedrv/mali"
 EXTRA_OEMAKE += "KDIR=${STAGING_KERNEL_BUILDDIR} USING_UMP=0 BUILD=release USING_PROFILING=0 MALI_PLATFORM=sunxi USING_DVFS=1 USING_DEVFREQ=1"
 MODULES_INSTALL_TARGET = "install"
 
-do_configure_prepend() {
+do_configure:prepend() {
     cd ${WORKDIR}/git/r6p2
     quilt pop -a || true
     quilt push -a
 }
 
-do_install_append() {
+do_install:append() {
     install -d ${D}${sysconfdir}/modules-load.d
     echo "blacklist lima" >> ${D}${sysconfdir}/modules-load.d/mali.conf
     echo "mali"           >> ${D}${sysconfdir}/modules-load.d/mali.conf

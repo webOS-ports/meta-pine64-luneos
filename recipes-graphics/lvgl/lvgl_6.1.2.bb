@@ -21,9 +21,9 @@ S = "${WORKDIR}/git"
 
 inherit cmake
 
-do_install_append() {
+do_install:append() {
     cp -v ${S}/lv_drv_conf.h ${S}/lv_conf.h ${D}/${includedir}/
 }
 
 # We build only static library (needed to include in SDK)
-ALLOW_EMPTY_${PN} = "1"
+ALLOW_EMPTY:${PN} = "1"
