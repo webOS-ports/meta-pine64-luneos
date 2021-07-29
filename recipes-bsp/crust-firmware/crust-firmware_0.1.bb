@@ -20,7 +20,7 @@ SRC_URI[sha256sum] = "52ccae980fb1e14c55ff6435a42eb26021b1baa45558864d0b58c55fc8
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 COMPATIBLE_MACHINE = "pinephone"
-PLATFORM_pinephone = "sun50i_a64"
+PLATFORM:pinephone = "sun50i_a64"
 
 # Let the Makefile handle setting up the CFLAGS and LDFLAGS as it is a standalone application
 CFLAGS[unexport] = "1"

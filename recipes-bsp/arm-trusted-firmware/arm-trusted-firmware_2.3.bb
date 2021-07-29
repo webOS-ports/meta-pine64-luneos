@@ -16,7 +16,7 @@ S = "${WORKDIR}/git"
 COMPATIBLE_MACHINE = "pine64|sopine-a64|pinephone"
 PLATFORM_pine64 = "sun50i_a64"
 PLATFORM_sopine-a64 = "sun50i_a64"
-PLATFORM_pinephone = "sun50i_a64"
+PLATFORM:pinephone = "sun50i_a64"
 
 # Let the Makefile handle setting up the CFLAGS and LDFLAGS as it is a standalone application
 CFLAGS[unexport] = "1"
