@@ -9,6 +9,8 @@ require recipes-kernel/linux/linux-yocto.inc
 LINUX_VERSION ?= "5.12"
 LINUX_VERSION_EXTENSION = "-pinephone"
 
+PV = "${LINUX_VERSION}-git${SRCPV}"
+
 KERNEL_VERSION_SANITY_SKIP="1"
 
 # KBUILD_DEFCONFIG:pinephone = "pinephone_defconfig"
