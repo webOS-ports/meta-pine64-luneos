@@ -16,7 +16,7 @@ EXTRA_DEP = ""
 
 do_configure[depends] += "${EXTRA_DEP}"
 
-do_configure:prepend_pinephone() {
+do_configure:prepend:pinephone() {
     # Insert the ATF binary
     if [ ! -f ${B}/bl31.bin ]; then
         ln ${DEPLOY_DIR}/images/${MACHINE}/bl31-${MACHINE}.bin ${B}/bl31.bin
