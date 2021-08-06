@@ -9,7 +9,7 @@ SRC_URI:append:pinephone = " file://10-pinephone-proximity.rules \
                              file://70-wifi-pm.rules \
 "
 
-do_install:append_pinephone() {
+do_install:append:pinephone() {
     # to help configure proximity sensor
     install -m 0644 ${WORKDIR}/10-pinephone-proximity.rules ${D}${sysconfdir}/udev/rules.d/10-pinephone-proximity.rules
     # configure EG25 modem nodes
