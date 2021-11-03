@@ -6,7 +6,7 @@ PV = "9.0+git${SRCPV}"
 
 DEPENDS = "libpng procps virtual/egl"
 
-SRC_URI = "git://github.com/apitrace/apitrace.git;protocol=https \
+SRC_URI = "git://github.com/apitrace/apitrace.git;protocol=https;branch=master \
            file://0001-Disable-multiarch-support-to-prevent-invalid-install.patch \
            file://0002-Use-GL-headers-from-sysroot.patch \
            file://0003-Exclude-retrace-from-build.patch \

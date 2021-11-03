@@ -7,8 +7,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 # DEPENDS = ""
 
 SRC_URI = " \
-	git://github.com/littlevgl/lvgl.git;name=lvgl;protocol=https;destsuffix=git/lvgl \
-	git://github.com/littlevgl/lv_drivers.git;name=lvdrivers;protocol=https;destsuffix=git/lv_drivers \
+	git://github.com/littlevgl/lvgl.git;name=lvgl;protocol=https;destsuffix=git/lvgl;branch=master \
+	git://github.com/littlevgl/lv_drivers.git;name=lvdrivers;protocol=https;destsuffix=git/lv_drivers;branch=master \
 	\
 	file://CMakeLists.txt;subdir=git/ \
 	file://lv_drv_conf.h;subdir=git/ \
