@@ -27,8 +27,9 @@ EOF
     # start telnetd for this IP
     start_telnetd 172.16.42.2
     
-    # start... a shell ? a nice UI ?
-    /usr/bin/luneos_recovery_ui || sh
+    # start minimalist recovery UI, and have a shell as fallback
+    /usr/bin/luneos_recovery_ui &
+    /sbin/getty -L ttyS0 115200 linux
    
 else
     # mount partition labeled "luneos-rootfs"
