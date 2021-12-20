@@ -1,0 +1,118 @@
+From: Arnaud Ferraris <arnaud.ferraris@gmail.com>
+Date: Thu, 9 Dec 2021 16:52:29 +0100
+Subject: arm64: dts: rk3399-pinephone-pro: improve sound device definition
+
+This commit renames the sound card and the "Headphone" widget so they
+match the names used by the ALSA UCM profiles.
+
+It also adds a jack detection GPIO to the sound card definition, and
+creates a new set of ADC keys for handling headset buttons.
+
+Signed-off-by: Arnaud Ferraris <arnaud.ferraris@gmail.com>
+---
+ .../boot/dts/rockchip/rk3399-pinephone-pro.dts     | 64 ++++++++++++++++------
+ 1 file changed, 46 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+index ef5a58c..1a1b4d1 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+@@ -48,6 +48,32 @@ button-down {
+ 		};
+ 	};
+ 
++	headset-keys {
++		compatible = "adc-keys";
++		io-channels = <&saradc 2>;
++		io-channel-names = "buttons";
++		keyup-threshold-microvolt = <900000>;
++		poll-interval = <100>;
++
++		headset-play {
++			label = "Play";
++			linux,code = <KEY_PLAYPAUSE>;
++			press-threshold-microvolt = <650000>;
++		};
++
++		headset-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			press-threshold-microvolt = <750000>;
++		};
++
++		headset-down {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			press-threshold-microvolt = <850000>;
++		};
++	};
++
+         bat: battery {
+                 compatible = "simple-battery";
+                 voltage-min-design-microvolt = <3400000>;
+@@ -184,38 +210,39 @@ ring_indicator: ring-indicator {
+ 	// spaker - amp enabled by SPK_CTL_H
+ 	//
+ 	// mclk - GPIO4_A0/I2S_CLK
+-	//
+-	// some gpio-jack-detection driver?
+-	//pinctrl-0 = <&hp_det>; // GPIO4_D4
+ 
+ 	rt5640-sound {
+ 		compatible = "simple-audio-card";
+-		simple-audio-card,name = "rockchip,rt5640-codec";
++		pinctrl-names = "default";
++		pinctrl-0 = <&hp_det>;
++		simple-audio-card,name = "PinePhonePro";
+ 		simple-audio-card,aux-devs = <&speaker_amp>;
+ 		simple-audio-card,format = "i2s";
+ 		simple-audio-card,mclk-fs = <256>;
++		simple-audio-card,hp-det-gpio = <&gpio4 RK_PD4 GPIO_ACTIVE_LOW>;
++		simple-audio-card,pin-switches = "Speaker";
+ 
+ 		simple-audio-card,widgets =
+-			"Microphone", "Headset Microphone",
+-			"Microphone", "Internal Microphone",
+-			"Headphone", "Headphone Jack",
+-			"Speaker", "Internal Earpiece",
+-			"Speaker", "Internal Speaker",
++			"Microphone", "Headset",
++			"Microphone", "Mic",
++			"Headphone", "Headphones",
++			"Speaker", "Earpiece",
++			"Speaker", "Speaker",
+ 			"Line", "Line In Modem",
+ 			"Line", "Line Out Modem";
+ 
+ 		simple-audio-card,routing =
+-			"Headphone Jack", "HPOL",
+-			"Headphone Jack", "HPOR",
+-			"Internal Earpiece", "SPOLP",
+-			"Internal Earpiece", "SPOLN",
+-			"Internal Speaker", "Speaker Amp OUTL",
+-			"Internal Speaker", "Speaker Amp OUTR",
++			"Headphones", "HPOL",
++			"Headphones", "HPOR",
++			"Earpiece", "SPOLP",
++			"Earpiece", "SPOLN",
++			"Speaker", "Speaker Amp OUTL",
++			"Speaker", "Speaker Amp OUTR",
+ 			"Speaker Amp INL", "HPOL",
+ 			"Speaker Amp INR", "HPOR",
+-			"DMIC1", "Internal Microphone",
+-			"Headset Microphone", "MICBIAS1",
+-			"IN2P", "Headset Microphone",
++			"DMIC1", "Mic",
++			"Headset", "MICBIAS1",
++			"IN2P", "Headset",
+ 			"Line Out Modem", "LOUTL",
+ 			"Line Out Modem", "LOUTR",
+ 			"IN3P", "Line In Modem",
+@@ -236,6 +263,7 @@ speaker_amp: audio-amplifier {
+ 		pinctrl-0 = <&spk_en>;
+ 		enable-gpios = <&gpio0 RK_PB3 GPIO_ACTIVE_HIGH>;
+ 		sound-name-prefix = "Speaker Amp";
++		VCC-supply = <&vcc5v0_sys>;
+ 	};
+ 
+ 	sdio_pwrseq: sdio-pwrseq {

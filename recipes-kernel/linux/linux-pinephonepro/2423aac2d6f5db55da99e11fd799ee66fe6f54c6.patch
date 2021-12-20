@@ -1,0 +1,172 @@
+From 2423aac2d6f5db55da99e11fd799ee66fe6f54c6 Mon Sep 17 00:00:00 2001
+From: Samuel Holland <samuel@sholland.org>
+Date: Mon, 9 Aug 2021 19:30:18 -0500
+Subject: [PATCH] Input: kb151 - Add support for the FN layer
+
+Signed-off-by: Samuel Holland <samuel@sholland.org>
+---
+ .../dts/allwinner/sun50i-a64-pinephone.dtsi   | 34 +++++++++++++++++--
+ drivers/input/keyboard/kb151.c                | 33 ++++++++++--------
+ 2 files changed, 51 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
+index 0bdc6eceec6099..68f5730cf164c7 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
+@@ -557,7 +557,7 @@
+ 		reg = <0x15>;
+ 		interrupt-parent = <&r_pio>;
+ 		interrupts = <0 12 IRQ_TYPE_EDGE_FALLING>; /* PL12 */
+-		keypad,num-rows = <6>;
++		keypad,num-rows = <12>;
+ 		keypad,num-columns = <12>;
+ 		linux,keymap = <MATRIX_KEY(0,  0, KEY_ESC)
+ 				MATRIX_KEY(0,  1, KEY_1)
+@@ -612,7 +612,37 @@
+ 				MATRIX_KEY(4,  9, KEY_LEFTBRACE)
+ 				MATRIX_KEY(5,  2, KEY_FN)
+ 				MATRIX_KEY(5,  3, KEY_LEFTALT)
+-				MATRIX_KEY(5,  5, KEY_RIGHTALT)>;
++				MATRIX_KEY(5,  5, KEY_RIGHTALT)
++
++				/* FN layer */
++				MATRIX_KEY(6,  1, KEY_BACKSLASH)
++				MATRIX_KEY(6,  2, KEY_BACKSLASH)
++				MATRIX_KEY(6,  3, KEY_DOLLAR)
++				MATRIX_KEY(6,  4, KEY_EURO)
++				MATRIX_KEY(6,  5, KEY_GRAVE)
++				MATRIX_KEY(6,  6, KEY_GRAVE)
++				MATRIX_KEY(6,  7, KEY_MINUS)
++				MATRIX_KEY(6,  8, KEY_EQUAL)
++				MATRIX_KEY(6,  9, KEY_MINUS)
++				MATRIX_KEY(6, 10, KEY_EQUAL)
++				MATRIX_KEY(6, 11, KEY_DELETE)
++
++				MATRIX_KEY(8,  0, KEY_SYSRQ)
++				MATRIX_KEY(8, 10, KEY_INSERT)
++
++				MATRIX_KEY(9,  0, KEY_LEFTSHIFT)
++				MATRIX_KEY(9,  8, KEY_HOME)
++				MATRIX_KEY(9,  9, KEY_UP)
++				MATRIX_KEY(9, 10, KEY_END)
++
++				MATRIX_KEY(10, 1, KEY_LEFTCTRL)
++				MATRIX_KEY(10, 6, KEY_LEFT)
++				MATRIX_KEY(10, 8, KEY_RIGHT)
++				MATRIX_KEY(10, 9, KEY_DOWN)
++
++				MATRIX_KEY(11, 2, KEY_FN)
++				MATRIX_KEY(11, 3, KEY_LEFTALT)
++				MATRIX_KEY(11, 5, KEY_RIGHTALT)>;
+ 		wakeup-source;
+ 	};
+ };
+diff --git a/drivers/input/keyboard/kb151.c b/drivers/input/keyboard/kb151.c
+index 595275d4f9d96f..bb6250efe93419 100644
+--- a/drivers/input/keyboard/kb151.c
++++ b/drivers/input/keyboard/kb151.c
+@@ -29,6 +29,7 @@ struct kb151 {
+ 	u8 row_shift;
+ 	u8 rows;
+ 	u8 cols;
++	u8 fn_state;
+ 	u8 buf_swap;
+ 	u8 buf[];
+ };
+@@ -55,7 +56,7 @@ static void kb151_update(struct i2c_client *client)
+ 		return;
+ 	}
+ 
+-	dev_info(dev, "%02x | %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
++	dev_dbg(dev, "%02x | %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+ 		new_buf[0], new_buf[1], new_buf[2], new_buf[3], new_buf[4], new_buf[5],
+ 		new_buf[6], new_buf[7], new_buf[8], new_buf[9], new_buf[10], new_buf[11],
+ 		new_buf[12]);
+@@ -65,8 +66,6 @@ static void kb151_update(struct i2c_client *client)
+ 			crc, new_buf[0]);
+ 		return;
+ 	}
+-	dev_info(dev, "Good scan data (%02x == %02x)\n",
+-		crc, new_buf[0]);
+ 
+ 	for (col = 0; col < kb151->cols; ++col) {
+ 		u8 old = *(++old_buf);
+@@ -74,14 +73,20 @@ static void kb151_update(struct i2c_client *client)
+ 		u8 changed = old ^ new;
+ 
+ 		for (row = 0; row < kb151->rows; ++row) {
+-			int code = MATRIX_SCAN_CODE(row, col, kb151->row_shift);
+ 			u8 pressed = new & BIT(row);
++			u8 map_row = row + (kb151->fn_state ? kb151->rows : 0);
++			int code = MATRIX_SCAN_CODE(map_row, col, kb151->row_shift);
+ 
+ 			if (!(changed & BIT(row)))
+ 				continue;
+ 
+ 			dev_dbg(&client->dev, "row %u col %u %sed\n",
+-				row, col, pressed ? "press" : "releas");
++				map_row, col, pressed ? "press" : "releas");
++			if (keymap[code] == KEY_FN) {
++				dev_dbg(&client->dev, "FN is now %s\n",
++					pressed ? "pressed" : "released");
++				kb151->fn_state = pressed;
++			} else
+ 			input_report_key(kb151->input, keymap[code], pressed);
+ 		}
+ 	}
+@@ -151,7 +156,7 @@ static int kb151_probe(struct i2c_client *client)
+ 	struct device *dev = &client->dev;
+ 	u8 info[KB151_MATRIX_SIZE + 1];
+ 	unsigned int kb_rows, kb_cols;
+-	unsigned int rows, cols;
++	unsigned int map_rows, map_cols;
+ 	struct kb151 *kb151;
+ 	int ret;
+ 
+@@ -168,20 +173,20 @@ static int kb151_probe(struct i2c_client *client)
+ 		 info[KB151_FW_REVISION] & 0xf,
+ 		 info[KB151_FW_FEATURES]);
+ 
+-	ret = matrix_keypad_parse_properties(dev, &rows, &cols);
++	ret = matrix_keypad_parse_properties(dev, &map_rows, &map_cols);
+ 	if (ret)
+ 		return ret;
+ 
+ 	kb_rows = info[KB151_MATRIX_SIZE] & 0xf;
+ 	kb_cols = info[KB151_MATRIX_SIZE] >> 4;
+-	if (rows > kb_rows || cols != kb_cols) {
++	if (map_rows != 2 * kb_rows || map_cols != kb_cols) {
+ 		dev_err(dev, "Keyboard matrix is %ux%u, but key map is %ux%u\n",
+-			kb_rows, kb_cols, rows, cols);
++			kb_rows, kb_cols, map_rows, map_cols);
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* Allocate two buffers, and include space for the CRC. */
+-	kb151 = devm_kzalloc(dev, struct_size(kb151, buf, 2 * (cols + 1)), GFP_KERNEL);
++	kb151 = devm_kzalloc(dev, struct_size(kb151, buf, 2 * (kb_cols + 1)), GFP_KERNEL);
+ 	if (!kb151)
+ 		return -ENOMEM;
+ 
+@@ -189,9 +194,9 @@ static int kb151_probe(struct i2c_client *client)
+ 
+ 	crc8_populate_msb(kb151->crc_table, KB151_CRC8_POLYNOMIAL);
+ 
+-	kb151->row_shift = get_count_order(cols);
+-	kb151->rows = rows;
+-	kb151->cols = cols;
++	kb151->row_shift = get_count_order(kb_cols);
++	kb151->rows = kb_rows;
++	kb151->cols = kb_cols;
+ 
+ 	kb151->input = devm_input_allocate_device(dev);
+ 	if (!kb151->input)
+@@ -207,7 +212,7 @@ static int kb151_probe(struct i2c_client *client)
+ 
+ 	__set_bit(EV_REP, kb151->input->evbit);
+ 
+-	ret = matrix_keypad_build_keymap(NULL, NULL, rows, cols,
++	ret = matrix_keypad_build_keymap(NULL, NULL, map_rows, map_cols,
+ 					 NULL, kb151->input);
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Failed to build keymap\n");
