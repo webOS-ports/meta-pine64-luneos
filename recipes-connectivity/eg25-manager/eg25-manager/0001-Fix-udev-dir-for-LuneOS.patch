@@ -8,7 +8,7 @@ Subject: [PATCH] Fix udev dir for LuneOS
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/meson.build b/meson.build
-index 4c7a523..c9b26cc 100644
+index 535927a..c837098 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -27,7 +27,7 @@ prefix = get_option('prefix')
@@ -16,10 +16,10 @@ index 4c7a523..c9b26cc 100644
  sysconfdir = get_option('sysconfdir')
  bindir = join_paths(prefix, get_option('bindir'))
 -udevrulesdir = join_paths(prefix, 'lib/udev/rules.d')
-+udevrulesdir = join_paths(sysconfdir, 'udev/rules.d')
++udevrulesdir = join_paths(prefix, 'udev/rules.d')
+ systemddir = join_paths(prefix, 'lib/systemd')
+ systemdsystemdir = join_paths(systemddir, 'system')
  
- if datadir.startswith('/')
-   full_datadir = datadir
 -- 
 2.17.1
 

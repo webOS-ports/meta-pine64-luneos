@@ -8,44 +8,57 @@ Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
  data/pine64,pinephone-1.0.toml | 1 +
  data/pine64,pinephone-1.1.toml | 1 +
  data/pine64,pinephone-1.2.toml | 1 +
- 3 files changed, 3 insertions(+)
+ data/pine64,pinephone-pro.toml | 1 +
+ 4 files changed, 4 insertions(+)
 
 diff --git a/data/pine64,pinephone-1.0.toml b/data/pine64,pinephone-1.0.toml
-index e1f5b24..664fe04 100644
+index 10dbc1e..5709774 100644
 --- a/data/pine64,pinephone-1.0.toml
 +++ b/data/pine64,pinephone-1.0.toml
-@@ -38,6 +38,7 @@ configure = [
-     { cmd = "QDAI", expect = "1,1,0,1,0,0,1,1" },
+@@ -43,6 +43,7 @@ configure = [
      { cmd = "QCFG", subcmd = "risignaltype", expect = "\"physical\"" },
+ # Enable VoLTE support
      { cmd = "QCFG", subcmd = "ims", expect = "1" },
 +    { cmd = "QMBNCFG", value = "\"AutoSel\",1" },
-     { cmd = "QCFG", subcmd = "urc/ri/ring", expect = "\"pulse\",2000,1000,5000,\"off\",1" },
-     { cmd = "QCFG", subcmd = "urc/ri/smsincoming", expect = "\"pulse\",2000" },
-     { cmd = "QCFG", subcmd = "urc/ri/other", expect = "\"off\",1" },
+ # Disable APREADY for PP 1.0 because pin is not connected
+     { cmd = "QCFG", subcmd = "apready", expect = "0,0,500" },
+ # URC configuration for PP 1.0 (APREADY pin not connected):
 diff --git a/data/pine64,pinephone-1.1.toml b/data/pine64,pinephone-1.1.toml
-index e1f5b24..664fe04 100644
+index 9242a91..c8ba535 100644
 --- a/data/pine64,pinephone-1.1.toml
 +++ b/data/pine64,pinephone-1.1.toml
-@@ -38,6 +38,7 @@ configure = [
-     { cmd = "QDAI", expect = "1,1,0,1,0,0,1,1" },
+@@ -43,6 +43,7 @@ configure = [
      { cmd = "QCFG", subcmd = "risignaltype", expect = "\"physical\"" },
+ # Enable VoLTE support
      { cmd = "QCFG", subcmd = "ims", expect = "1" },
 +    { cmd = "QMBNCFG", value = "\"AutoSel\",1" },
-     { cmd = "QCFG", subcmd = "urc/ri/ring", expect = "\"pulse\",2000,1000,5000,\"off\",1" },
-     { cmd = "QCFG", subcmd = "urc/ri/smsincoming", expect = "\"pulse\",2000" },
-     { cmd = "QCFG", subcmd = "urc/ri/other", expect = "\"off\",1" },
+ # Disable APREADY for PP 1.1 because pin is not connected
+     { cmd = "QCFG", subcmd = "apready", expect = "0,0,500" },
+ # URC configuration for PP 1.1 (APREADY pin not connected):
 diff --git a/data/pine64,pinephone-1.2.toml b/data/pine64,pinephone-1.2.toml
-index 4ca1274..874251b 100644
+index 3754274..4ed4a74 100644
 --- a/data/pine64,pinephone-1.2.toml
 +++ b/data/pine64,pinephone-1.2.toml
-@@ -35,6 +35,7 @@ configure = [
-     { cmd = "QDAI", expect = "1,1,0,1,0,0,1,1" },
+@@ -40,6 +40,7 @@ configure = [
      { cmd = "QCFG", subcmd = "risignaltype", expect = "\"physical\"" },
+ # Enable VoLTE support
      { cmd = "QCFG", subcmd = "ims", expect = "1" },
 +    { cmd = "QMBNCFG", value = "\"AutoSel\",1" },
+ # Enable APREADY for PP 1.2
      { cmd = "QCFG", subcmd = "apready", expect = "1,0,500" },
-     { cmd = "QURCCFG", subcmd = "urcport", expect = "\"all\"" },
-     { cmd = "QGPS", value = "1" },
+ # URC configuration for PP 1.2 (APREADY pin connected):
+diff --git a/data/pine64,pinephone-pro.toml b/data/pine64,pinephone-pro.toml
+index 492de96..72339f9 100644
+--- a/data/pine64,pinephone-pro.toml
++++ b/data/pine64,pinephone-pro.toml
+@@ -40,6 +40,7 @@ configure = [
+     { cmd = "QCFG", subcmd = "risignaltype", expect = "\"physical\"" },
+ # Enable VoLTE support
+     { cmd = "QCFG", subcmd = "ims", expect = "1" },
++    { cmd = "QMBNCFG", value = "\"AutoSel\",1" },
+ # Enable APREADY for PP 1.2
+     { cmd = "QCFG", subcmd = "apready", expect = "1,0,500" },
+ # URC configuration for PP 1.2 (APREADY pin connected):
 -- 
 2.17.1
 

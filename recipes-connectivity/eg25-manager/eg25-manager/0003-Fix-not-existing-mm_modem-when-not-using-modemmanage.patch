@@ -1,0 +1,34 @@
+From 4194cec8a310900da2f9a51a2ad80f882aeb8fd5 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 20 Dec 2021 00:46:58 +0100
+Subject: [PATCH] Fix not existing mm_modem when not using modemmanager
+
+---
+ src/suspend.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/suspend.c b/src/suspend.c
+index 190d48d..e35d172 100644
+--- a/src/suspend.c
++++ b/src/suspend.c
+@@ -27,14 +27,14 @@ static void resume_ok(struct EG25Manager *manager)
+ static gboolean check_modem_resume(struct EG25Manager *manager)
+ {
+     manager->modem_recovery_timer = 0;
+-
++    #if defined(mm_modem)
+     if (manager->mm_modem) {
+         resume_ok(manager);
+     } else {
+         g_message("Modem wasn't probed in time, restart it!");
+         modem_reset(manager);
+     }
+-
++    #endif
+     return FALSE;
+ }
+ 
+-- 
+2.31.0.windows.1
+
+ 
