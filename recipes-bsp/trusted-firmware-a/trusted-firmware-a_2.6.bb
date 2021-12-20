@@ -8,15 +8,21 @@ inherit deploy
 PROVIDES = "virtual/arm-trusted-firmware"
 
 BRANCH = "master"
-SRCREV ?= "38b7c9c651c304bed9eea47905fc3072fb2af24e"
-SRC_URI = "git://github.com/ARM-software/arm-trusted-firmware.git;protocol=https;branch=${BRANCH}"
+SRCREV ?= "a1f02f4f3daae7e21ee58b4c93ec3e46b8f28d15"
+SRC_URI = "git://git.trustedfirmware.org/TF-A/trusted-firmware-a.git;protocol=https;branch=${BRANCH}"
+
+SRC_URI:append:rk3399 = " \
+    file://0001-rk3399-baudrate.patch \
+    "
 
 S = "${WORKDIR}/git"
 
-COMPATIBLE_MACHINE = "pine64|sopine-a64|pinephone"
+COMPATIBLE_MACHINE = "pine64|sopine-a64|pinephone|pinephonepro"
+
 PLATFORM:pine64 = "sun50i_a64"
 PLATFORM:sopine-a64 = "sun50i_a64"
 PLATFORM:pinephone = "sun50i_a64"
+PLATFORM:pinephonepro = "rk3399"
 
 # Let the Makefile handle setting up the CFLAGS and LDFLAGS as it is a standalone application
 CFLAGS[unexport] = "1"
@@ -36,9 +42,13 @@ do_install() {
 	:
 }
 
+
 do_deploy() {
-	install -m 0644 ${S}/${PLATFORM}/release/bl31/bl31.elf ${DEPLOYDIR}/bl31-${MACHINE}.elf
-	install -m 0644 ${S}/${PLATFORM}/release/bl31.bin ${DEPLOYDIR}/bl31-${MACHINE}.bin
+	install -m 0644 ${S}/${PLATFORM}/release/bl31/bl31.elf ${DEPLOYDIR}/bl31-${PLATFORM}.elf
+}
+
+do_deploy:append:pinephone() {
+	install -m 0644 ${S}/${PLATFORM}/release/bl31.bin ${DEPLOYDIR}/bl31-${PLATFORM}.bin
 }
 
 addtask deploy before do_build after do_compile

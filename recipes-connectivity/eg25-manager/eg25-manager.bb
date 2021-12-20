@@ -3,19 +3,20 @@ SUMMARY = "Quectel EG25 management daemon"
 LICENSE = "GPL-3.0"
 LIC_FILES_CHKSUM = "file://COPYING;md5=d32239bcb673463ab874e80d47fae504"
 
-DEPENDS = "glib-2.0 libgpiod libgudev libusb glib-2.0-native"
+DEPENDS = "glib-2.0 libgpiod libgudev libusb glib-2.0-native curl"
 RDEPENDS:${PN} = "atinout"
 
 inherit meson
 inherit systemd
 
-PV = "0.2.1+git${SRCPV}"
+PV = "0.4.2-1+git${SRCPV}"
 
-SRCREV = "f2593b62b10513f94039d5c9ba995905b23e7eb4"
+SRCREV = "88c68b9933f47f863e6685b2b6502d5d7ed1871c"
 SRC_URI = " \
     git://gitlab.com/mobian1/devices/eg25-manager.git;protocol=https;branch=master \
     file://0001-Fix-udev-dir-for-LuneOS.patch \
     file://0002-Add-VoLTE-configuration.patch \
+    file://0003-Fix-not-existing-mm_modem-when-not-using-modemmanage.patch \
     file://eg25-manager.service \
 "
 S = "${WORKDIR}/git"
@@ -27,7 +28,10 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/eg25-manager.service ${D}${systemd_system_unitdir}/eg25-manager.service
 }
 
-FILES:${PN} = "${sysconfdir}/udev/rules.d/80-modem-eg25.rules \
+FILES:${PN} = "/usr/udev \
+               /usr/udev/rules.d \
+               /usr/udev/rules.d/80-modem-eg25.rules \
+               ${libdir} \
                ${datadir}/eg25-manager \
                ${bindir}/eg25manager \
                ${bindir}/eg25-configure-usb \

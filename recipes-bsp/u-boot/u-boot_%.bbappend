@@ -1,17 +1,26 @@
 FILESEXTRAPATHS:prepend:pinephone := "${THISDIR}/files:"
+FILESEXTRAPATHS:prepend:pinephonepro := "${THISDIR}/files:"
 
 LIC_FILES_CHKSUM:pinephone = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
+LIC_FILES_CHKSUM:pinephonepro = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 
-SRCREV:pinephone = "c784be467aa7d111f149c2a54557e8828bc5775a"
+SRCREV:pinephonepro = "eaf7654d278c8c08653690e0e5a4c24ca0e705a9"
+SRC_URI:pinephonepro = " \
+    git://github.com/herrie82/u-boot.git;protocol=https;branch=herrie/ppp \
+"
+
+SRCREV:pinephone = "880f5035decae44a5be943875f35ed9d9efc011d"
 SRC_URI:pinephone = " \
     git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
     file://0001-sunxi-h3-Fix-PLL1-setup-to-never-use-dividers.patch \
     file://boot.txt \
 "
 
-DEPENDS:append:pinephone = " arm-trusted-firmware crust-firmware u-boot-tools-native python3-setuptools-native"
+DEPENDS:append = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
+DEPENDS:append:pinephone = " crust-firmware"
 
-EXTRA_DEP:pinephone = "arm-trusted-firmware:do_deploy crust-firmware:do_deploy"
+EXTRA_DEP:pinephone = "trusted-firmware-a:do_deploy crust-firmware:do_deploy"
+EXTRA_DEP:pinephonepro = "trusted-firmware-a:do_deploy"
 EXTRA_DEP = ""
 
 do_configure[depends] += "${EXTRA_DEP}"
