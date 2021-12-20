@@ -24,6 +24,9 @@ PLATFORM:sopine-a64 = "sun50i_a64"
 PLATFORM:pinephone = "sun50i_a64"
 PLATFORM:pinephonepro = "rk3399"
 
+BL_FILENAME:pinephone = "${MACHINE}"
+BL_FILENAME:pinephonepro = "${PLATFORM}"
+
 # Let the Makefile handle setting up the CFLAGS and LDFLAGS as it is a standalone application
 CFLAGS[unexport] = "1"
 LDFLAGS[unexport] = "1"
@@ -42,13 +45,11 @@ do_install() {
 	:
 }
 
-
 do_deploy() {
-	install -m 0644 ${S}/${PLATFORM}/release/bl31/bl31.elf ${DEPLOYDIR}/bl31-${PLATFORM}.elf
-}
-
-do_deploy:append:pinephone() {
-	install -m 0644 ${S}/${PLATFORM}/release/bl31.bin ${DEPLOYDIR}/bl31-${PLATFORM}.bin
+	install -m 0644 ${S}/${PLATFORM}/release/bl31/bl31.elf ${DEPLOYDIR}/bl31-${BL_FILENAME}.elf
+	if [ -f "${S}/${PLATFORM}/release/bl31.bin" ]; then
+		install -m 0644 ${S}/${PLATFORM}/release/bl31.bin ${DEPLOYDIR}/bl31-${BL_FILENAME}.bin	
+	fi
 }
 
 addtask deploy before do_build after do_compile
