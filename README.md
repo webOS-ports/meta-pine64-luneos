@@ -2,19 +2,40 @@ LuneOS Pine64 layer
 =============
 This layer will allow you to build a (partially) functional image of LuneOS for the Pinephone devkit.
 
-## What works?
 
-So far, there are still lots to do, only the essential stuff works:
-- touchscreen
-- display (using Mali DRM driver)
-- apps
- 
-This means the following hasn't been integrated yet:
-- no WiFi
-- no Bluetooth
-- no calls or SMS
+## Status
 
-Also note that Mali driver is still very young, and there are lots of graphical artefacts on the screen.
+### Pinephone: what works
+
+- Almost everything except camera
+
+### Pinephone: known issues
+
+- Camera doesn't work yet
+- Some conflicts seem to happen between wifi and cellular connections at first boot. If the connection to wifi doesn't work on first boot, reboot and use the Wifi app to connect.
+- Cellular data has not yet been tested
+
+Note: rendering is done using Mesa and the Mali driver.
+
+### Pinephone Pro: what works
+
+- Screen
+- Wifi
+- Brightness slider
+- Volume buttons, power button
+- Modem (powers on, not tested anything else yet)
+- Bluetooth (seems to power on, haven't tested it further)
+- Brightness sensor
+- Audio playback
+- Rotation (mostly) and most other sensors
+- Power Button
+
+### Pinephone Pro: doesn't work/known issues
+
+- Rotation sensor when screen is turned 180 degrees
+- Magnetometer
+- Barometer (supposedly included according to press release)?
+- Headphones: Sound plays on both headphones and speaker at the same time.
 
 ## Instructions
 
@@ -43,7 +64,9 @@ sudo su
 sudo wic write tmp-glibc/deploy/images/pinephone/luneos-dev-image-pinephone.wic /dev/sdd
 ```
 
-Please note that it's a work-in-progress code, and at this stage it's useless to report the tons of
+**Note**: for Pinephone Pro, replace pinephone with pinephonepro in all the previous steps.
+
+Please note that it's still a work-in-progress code, and at this stage it's useless to report the tons of
 issues you'll be experiencing with this image.
 
 ## Copyright and License Information
