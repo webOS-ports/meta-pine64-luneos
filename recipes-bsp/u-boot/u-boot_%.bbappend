@@ -26,7 +26,8 @@ SRC_URI:pinephone = " \
     file://boot.txt \
 "
 
-DEPENDS:append = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
+DEPENDS:append:pinephone = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
+DEPENDS:append:pinephonepro = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
 DEPENDS:append:pinephone = " crust-firmware"
 
 EXTRA_DEP:pinephone = "trusted-firmware-a:do_deploy crust-firmware:do_deploy"
