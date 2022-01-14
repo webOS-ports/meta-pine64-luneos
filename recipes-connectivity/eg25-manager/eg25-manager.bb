@@ -6,8 +6,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=d32239bcb673463ab874e80d47fae504"
 DEPENDS = "glib-2.0 libgpiod libgudev libusb glib-2.0-native"
 RDEPENDS:${PN} = "atinout"
 
-inherit meson
-inherit systemd
+inherit meson systemd pkgconfig
 
 PV = "0.2.1+git${SRCPV}"
 
