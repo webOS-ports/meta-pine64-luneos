@@ -11,18 +11,10 @@ SRC_URI:pinephonepro = " \
     git://github.com/herrie82/u-boot.git;protocol=https;branch=herrie/ppp \
 "
 
-SRCREV:pinephone = "d80bb749fab53da72c4a0e09b8c2d2aaa3103c91"
+SRCREV:pinephone = "880f5035decae44a5be943875f35ed9d9efc011d"
 SRC_URI:pinephone = " \
-    git://github.com/trini/u-boot.git;protocol=https;branch=master \
-    file://0010-sunxi-DT-H6-update-device-tree-files.patch \
-    file://0020-sunxi-DT-H6-Add-USB3-to-Pine-H64-DTS.patch \
-    file://0023-pinephone-Add-volume_key-environment-variable.patch \
-    file://0024-Enable-led-on-boot-to-notify-user-of-boot-status.patch \
-    file://0027-mmc-sunxi-Add-support-for-DMA-transfers.patch \
-    file://0028-mmc-sunxi-DDR-DMA-support-for-SPL.patch \
-    file://0029-spl-ARM-Enable-CPU-caches.patch \
-    file://0030-common-expose-DRAM-clock-speed.patch \
-    file://0031-Improve-Allwinner-A64-timer-workaround.patch \
+    git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
+    file://0001-sunxi-h3-Fix-PLL1-setup-to-never-use-dividers.patch \
     file://boot.txt \
 "
 
