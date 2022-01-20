@@ -12,7 +12,6 @@ SRCREV ?= "a1f02f4f3daae7e21ee58b4c93ec3e46b8f28d15"
 SRC_URI = "git://git.trustedfirmware.org/TF-A/trusted-firmware-a.git;protocol=https;branch=${BRANCH}"
 
 SRC_URI:append = " \
-    file://0001-rk3399-baudrate.patch \
     file://0002-allwinner-Choose-PSCI-states-to-avoid-translation.patch \
     file://0003-allwinner-Simplify-CPU_SUSPEND-power-state-encoding.patch \
     "
