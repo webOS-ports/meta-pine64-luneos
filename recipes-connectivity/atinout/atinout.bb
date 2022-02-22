@@ -1,6 +1,6 @@
 SUMMARY = "Execute AT commands in sequence and capture the response from the modem"
 HOMEPAGE = "https://sourceforge.net/projects/atinout/"
-LICENSE = "GPL-3.0"
+LICENSE = "GPL-3.0-only"
 LIC_FILES_CHKSUM = "file://gplv3.txt;md5=d32239bcb673463ab874e80d47fae504"
 
 DEPENDS = "util-linux"
