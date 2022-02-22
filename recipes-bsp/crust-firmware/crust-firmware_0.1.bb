@@ -1,6 +1,6 @@
 SUMMARY = "Crust Firmware"
 DESCRIPTION = "Crust Libre SCP firmware for Allwinner sunxi SoCs."
-LICENSE = "BSD-1-Clause & BSD-3-Clause & GPLv2 & MIT"
+LICENSE = "BSD-1-Clause & BSD-3-Clause & GPL-2.0-only & MIT"
 LIC_FILES_CHKSUM = 'file://LICENSE.md;md5=ce7d78bbe29bbf107647692966b8209b'
 
 inherit deploy
