@@ -15,7 +15,7 @@ SRCREV:pinephone = "880f5035decae44a5be943875f35ed9d9efc011d"
 SRC_URI:pinephone = " \
     git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
     file://0001-sunxi-h3-Fix-PLL1-setup-to-never-use-dividers.patch \
-    file://boot.txt \
+    file://boot.cmd \
 "
 
 DEPENDS:append:pinephone = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
@@ -38,9 +38,6 @@ do_configure:prepend:pinephone() {
     if [ ! -f ${B}/scp.bin ]; then
         ln ${DEPLOY_DIR}/images/${MACHINE}/scp-${MACHINE}.bin ${B}/scp.bin
     fi
-    
-    mkimage -A arm -O linux -T script -C none -n "U-Boot boot script" \
-        -d ${WORKDIR}/boot.txt ${WORKDIR}/boot.scr
 }
 
 FILES:${PN}:append:pinephone = " /boot/boot.scr"
