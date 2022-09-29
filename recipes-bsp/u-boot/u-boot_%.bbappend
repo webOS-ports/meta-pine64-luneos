@@ -11,12 +11,10 @@ SRC_URI:pinephonepro = " \
     git://github.com/herrie82/u-boot.git;protocol=https;branch=herrie/ppp \
 "
 
-SRCREV:pinephone = "880f5035decae44a5be943875f35ed9d9efc011d"
-SRC_URI:pinephone = " \
-    git://gitlab.com/pine64-org/u-boot.git;protocol=https;branch=crust \
-    file://0001-sunxi-h3-Fix-PLL1-setup-to-never-use-dividers.patch \
-    file://boot.cmd \
+SRC_URI:append:pinephone = " \
+    file://boot.cmd    \
 "
+UBOOT_MAKE_TARGET:pinephone = "pinephone_defconfig all"
 
 DEPENDS:append:pinephone = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
 DEPENDS:append:pinephonepro = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
