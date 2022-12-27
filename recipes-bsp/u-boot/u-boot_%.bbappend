@@ -13,6 +13,7 @@ SRC_URI:pinephonepro = " \
 
 SRC_URI:append:pinephone = " \
     file://boot.cmd    \
+    file://0001-pinephone-Add-volume_key-environment-variable.patch \
 "
 UBOOT_MAKE_TARGET:pinephone = "pinephone_defconfig all"
 
