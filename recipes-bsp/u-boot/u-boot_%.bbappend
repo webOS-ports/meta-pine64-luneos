@@ -1,7 +1,6 @@
 FILESEXTRAPATHS:prepend:pinephone := "${THISDIR}/files:"
 FILESEXTRAPATHS:prepend:pinephonepro := "${THISDIR}/files:"
 
-LIC_FILES_CHKSUM:pinephone = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 LIC_FILES_CHKSUM:pinephonepro = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 
 PV:pinephonepro ="2021.10"
