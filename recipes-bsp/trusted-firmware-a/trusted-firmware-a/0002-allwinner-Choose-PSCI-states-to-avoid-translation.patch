@@ -1,4 +1,4 @@
-From 981a0f37f9c2d8e9cdff5bf34c80c3dd7e1128ae Mon Sep 17 00:00:00 2001
+From dc74ac2eb0e341908ab9ffe4290715ebde6ab931 Mon Sep 17 00:00:00 2001
 From: Samuel Holland <samuel@sholland.org>
 Date: Thu, 18 Mar 2021 22:55:15 -0500
 Subject: [PATCH] allwinner: Choose PSCI states to avoid translation
@@ -15,7 +15,7 @@ Change-Id: I26691085f277a96bd405e3305ab0fe390a92b418
  2 files changed, 7 insertions(+), 17 deletions(-)
 
 diff --git a/plat/allwinner/common/include/platform_def.h b/plat/allwinner/common/include/platform_def.h
-index 4893368c2..fc9c966ba 100644
+index 49951e0804..1ff6f6854d 100644
 --- a/plat/allwinner/common/include/platform_def.h
 +++ b/plat/allwinner/common/include/platform_def.h
 @@ -57,9 +57,10 @@
@@ -33,7 +33,7 @@ index 4893368c2..fc9c966ba 100644
  #define PLAT_MAX_PWR_LVL		U(2)
  #define PLAT_NUM_PWR_DOMAINS		(U(1) + \
 diff --git a/plat/allwinner/common/sunxi_scpi_pm.c b/plat/allwinner/common/sunxi_scpi_pm.c
-index 74763ef7e..89c834aa9 100644
+index eb37daa636..ed1363537e 100644
 --- a/plat/allwinner/common/sunxi_scpi_pm.c
 +++ b/plat/allwinner/common/sunxi_scpi_pm.c
 @@ -44,17 +44,6 @@
@@ -67,6 +67,3 @@ index 74763ef7e..89c834aa9 100644
  }
  
  static void sunxi_pwr_domain_on_finish(const psci_power_state_t *target_state)
--- 
-2.33.1
-

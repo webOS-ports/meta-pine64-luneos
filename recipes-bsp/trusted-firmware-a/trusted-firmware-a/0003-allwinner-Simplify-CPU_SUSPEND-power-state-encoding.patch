@@ -1,4 +1,4 @@
-From 75ddf133e308f7ce15af9ecd899079a22c59dcfc Mon Sep 17 00:00:00 2001
+From 3bde8fe44567edc31178601d5c0fbca6b68de708 Mon Sep 17 00:00:00 2001
 From: Samuel Holland <samuel@sholland.org>
 Date: Thu, 18 Mar 2021 23:15:28 -0500
 Subject: [PATCH] allwinner: Simplify CPU_SUSPEND power state encoding
@@ -17,7 +17,7 @@ Change-Id: I4b3b84e5c255ee58a25255a0cab5d7623425086e
  1 file changed, 16 insertions(+), 20 deletions(-)
 
 diff --git a/plat/allwinner/common/sunxi_scpi_pm.c b/plat/allwinner/common/sunxi_scpi_pm.c
-index 89c834aa9..8dcc54b16 100644
+index ed1363537e..41dc56397a 100644
 --- a/plat/allwinner/common/sunxi_scpi_pm.c
 +++ b/plat/allwinner/common/sunxi_scpi_pm.c
 @@ -33,6 +33,9 @@
@@ -80,6 +80,3 @@ index 89c834aa9..8dcc54b16 100644
  		req_state->pwr_domain_state[i] = PSCI_LOCAL_STATE_RUN;
  	}
  
--- 
-2.33.1
-
