@@ -1,0 +1,39 @@
+From 929ea12168e0a8829ccb787eb7662f8a0ff1f1cf Mon Sep 17 00:00:00 2001
+From: Marco Felsch <m.felsch@pengutronix.de>
+Date: Thu, 24 Nov 2022 11:02:05 +0100
+Subject: [PATCH] build(makefile): add helper to detect linker options
+
+This is a small helper to check for possible linker options. If the
+linker supports the requested option it is returned and if not nothing
+will be returned, e.g.:
+
+  TF_LDFLAGS += $(call ld_option, --no-warn-rwx-segments)
+
+can be called unconditional.
+
+Signed-off-by: Marco Felsch <m.felsch@pengutronix.de>
+Signed-off-by: Martin Jansa <Martin.Jansa@gmail.com>
+Change-Id: I236800852ece49948ff53a0b91fddba53c8f0f95
+---
+Upstream-Status: Backport [2.9 https://review.trustedfirmware.org/c/TF-A/trusted-firmware-a/+/19400]
+
+ make_helpers/build_macros.mk | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/make_helpers/build_macros.mk b/make_helpers/build_macros.mk
+index 12aaee6841..ec6e2a0f4a 100644
+--- a/make_helpers/build_macros.mk
++++ b/make_helpers/build_macros.mk
+@@ -86,6 +86,12 @@ define assert_numerics
+     $(foreach num,$1,$(eval $(call assert_numeric,$(num))))
+ endef
+ 
++# Convenience function to check for a given linker option. An call to
++# $(call ld_option, --no-XYZ) will return --no-XYZ if supported by the linker
++define ld_option
++	$(shell if $(LD) $(1) -v >/dev/null 2>&1; then echo $(1); fi )
++endef
++
+ # CREATE_SEQ is a recursive function to create sequence of numbers from 1 to
+ # $(2) and assign the sequence to $(1)
+ define CREATE_SEQ
