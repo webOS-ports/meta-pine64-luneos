@@ -14,7 +14,9 @@ SRC_URI = "git://git.trustedfirmware.org/TF-A/trusted-firmware-a.git;protocol=ht
 SRC_URI:append = " \
     file://0002-allwinner-Choose-PSCI-states-to-avoid-translation.patch \
     file://0003-allwinner-Simplify-CPU_SUSPEND-power-state-encoding.patch \
-    "
+    file://0004-build-makefile-add-helper-to-detect-linker-options.patch \
+    file://0005-feat-build-add-support-for-new-binutils-versions.patch \
+"
 
 S = "${WORKDIR}/git"
 
