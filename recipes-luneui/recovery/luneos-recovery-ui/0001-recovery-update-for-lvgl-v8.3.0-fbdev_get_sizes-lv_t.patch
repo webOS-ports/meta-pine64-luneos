@@ -1,0 +1,41 @@
+From 58e8158d0bf6346407db19a8a0d08b96db64d3e8 Mon Sep 17 00:00:00 2001
+From: Martin Jansa <Martin.Jansa@gmail.com>
+Date: Sun, 28 May 2023 15:39:57 +0200
+Subject: [PATCH] recovery: update for lvgl v8.3.0 fbdev_get_sizes lv_tick_inc
+ API
+
+* fbdev_get_sizes needs dpi as 3rd param since:
+  https://github.com/lvgl/lv_drivers/commit/0412762e1ecb4f13bb59e735e9577bad555f6c8a
+* lv_tick_inc is undefined since custom tick was enabled in:
+  https://git.openembedded.org/meta-openembedded/commit/?id=6a2fb1f751307f29cafdd3f35fc8452f93d37d0c
+  main.c already defines matching custom tick function
+
+Signed-off-by: Martin Jansa <Martin.Jansa@gmail.com>
+---
+Upstream-Status: Submitted [https://github.com/Tofee/luneos-recovery-ui/pull/2]
+
+ recovery/main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/recovery/main.c b/recovery/main.c
+index 28c65c6..5f968ac 100644
+--- a/recovery/main.c
++++ b/recovery/main.c
+@@ -36,7 +36,8 @@ int main(void)
+     static lv_disp_drv_t disp_drv;
+     lv_disp_drv_init(&disp_drv);
+     disp_drv.draw_buf = &draw_buf;
+-    fbdev_get_sizes(&disp_drv.hor_res, &disp_drv.ver_res);
++    uint32_t dpi;
++    fbdev_get_sizes(&disp_drv.hor_res, &disp_drv.ver_res, &dpi);
+     disp_drv.flush_cb = fbdev_flush;
+     lv_disp_drv_register(&disp_drv);
+ 
+@@ -54,7 +55,6 @@ int main(void)
+     while(1) {
+         lv_task_handler();
+         usleep(5000);    // wait 5ms
+-        lv_tick_inc(5);  // inform lvgl that 5ms have passed
+     }
+ 
+     return 0;
