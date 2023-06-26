@@ -4,6 +4,8 @@ Date: Thu, 29 Apr 2021 17:46:21 +0000
 Subject: [PATCH] Fix udev dir for LuneOS
 
 ---
+Upstream-Status: Pending
+
  meson.build | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 

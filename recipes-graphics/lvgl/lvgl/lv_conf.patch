@@ -7,6 +7,8 @@ Based on https://github.com/webOS-ports/meta-pine64-luneos/pull/33/files#diff-1f
 
 Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
 ---
+Upstream-Status: Pending
+
  lv_conf_template.h | 18 +++++++++---------
  1 file changed, 9 insertions(+), 9 deletions(-)
 

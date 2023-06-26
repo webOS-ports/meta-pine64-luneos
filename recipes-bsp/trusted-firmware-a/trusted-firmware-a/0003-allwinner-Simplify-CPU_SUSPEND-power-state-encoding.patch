@@ -13,6 +13,8 @@ WFI can be used without PSCI, we do not allow passing in standby states.
 Signed-off-by: Samuel Holland <samuel@sholland.org>
 Change-Id: I4b3b84e5c255ee58a25255a0cab5d7623425086e
 ---
+Upstream-Status: Pending
+
  plat/allwinner/common/sunxi_scpi_pm.c | 36 ++++++++++++---------------
  1 file changed, 16 insertions(+), 20 deletions(-)
 

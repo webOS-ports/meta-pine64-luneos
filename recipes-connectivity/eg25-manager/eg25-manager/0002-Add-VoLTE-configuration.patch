@@ -5,6 +5,8 @@ Subject: [PATCH] Add VoLTE configuration
 
 Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
 ---
+Upstream-Status: Pending
+
  data/pine64,pinephone-1.0.toml | 1 +
  data/pine64,pinephone-1.1.toml | 1 +
  data/pine64,pinephone-1.2.toml | 1 +
