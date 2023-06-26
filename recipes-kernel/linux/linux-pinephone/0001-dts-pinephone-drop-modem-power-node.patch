@@ -4,6 +4,8 @@ Date: Wed, 16 Dec 2020 20:16:14 -0800
 Subject: [PATCH] dts: pinephone: drop modem-power node
 
 ---
+Upstream-Status: Pending
+
  .../allwinner/sun50i-a64-pinephone-1.0.dts    | 26 +++---------------
  .../allwinner/sun50i-a64-pinephone-1.1.dts    | 27 +++----------------
  .../allwinner/sun50i-a64-pinephone-1.2.dts    | 27 +++----------------

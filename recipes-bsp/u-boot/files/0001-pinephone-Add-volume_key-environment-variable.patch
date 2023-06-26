@@ -9,6 +9,8 @@ contain either value 'down' or 'up', otherwise it will be empty.
 Signed-off-by: Ondrej Jirman <megous@megous.com>
 Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
 ---
+Upstream-Status: Pending
+
  board/sunxi/Makefile |  1 +
  board/sunxi/board.c  | 19 +++++++++++
  board/sunxi/lradc.c  | 81 ++++++++++++++++++++++++++++++++++++++++++++
