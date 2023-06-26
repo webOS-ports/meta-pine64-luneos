@@ -10,6 +10,8 @@ state, for future growth.
 Signed-off-by: Samuel Holland <samuel@sholland.org>
 Change-Id: I26691085f277a96bd405e3305ab0fe390a92b418
 ---
+Upstream-Status: Pending
+
  plat/allwinner/common/include/platform_def.h |  7 ++++---
  plat/allwinner/common/sunxi_scpi_pm.c        | 17 +++--------------
  2 files changed, 7 insertions(+), 17 deletions(-)
