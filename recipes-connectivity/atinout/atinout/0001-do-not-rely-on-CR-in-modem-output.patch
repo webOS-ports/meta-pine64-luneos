@@ -4,6 +4,8 @@ Date: Fri, 27 Oct 2017 10:42:50 +0200
 Subject: do not rely on CR in modem output
 
 ---
+Upstream-Status: Pending
+
  atinout.c | 24 +++++++++++-------------
  1 file changed, 11 insertions(+), 13 deletions(-)
 

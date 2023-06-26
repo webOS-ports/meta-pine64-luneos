@@ -1,3 +1,5 @@
+Upstream-Status: Pending
+
 --- a/lv_drv_conf_template.h	2022-05-11 18:50:39.848654645 +0000
 +++ b/lv_drv_conf_template.h	2022-05-11 18:40:25.650469080 +0000
 @@ -306,7 +306,7 @@

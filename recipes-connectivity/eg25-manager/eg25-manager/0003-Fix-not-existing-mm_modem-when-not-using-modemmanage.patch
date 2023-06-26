@@ -4,6 +4,8 @@ Date: Mon, 20 Dec 2021 00:46:58 +0100
 Subject: [PATCH] Fix not existing mm_modem when not using modemmanager
 
 ---
+Upstream-Status: Pending
+
  src/suspend.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 

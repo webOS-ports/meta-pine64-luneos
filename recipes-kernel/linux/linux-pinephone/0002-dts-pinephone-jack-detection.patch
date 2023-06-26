@@ -4,6 +4,8 @@ Date: Mon, 15 Feb 2021 13:18:02 -0800
 Subject: [PATCH] dts: pinephone: jack detection
 
 ---
+Upstream-Status: Pending
+
  arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
