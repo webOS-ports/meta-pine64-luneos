@@ -1,6 +1,6 @@
 LuneOS Pine64 layer
 =============
-This layer will allow you to build a (partially) functional image of LuneOS for the Pinephone devkit.
+This layer will allow you to build a (partially) functional image of LuneOS for the PinePhone(Pro) and PineTab2.
 
 
 ## Status
@@ -37,6 +37,16 @@ Note: rendering is done using Mesa and the Mali driver.
 - Barometer (supposedly included according to press release)?
 - Headphones: Sound plays on both headphones and speaker at the same time.
 
+### PineTab2: what works
+
+- Screen
+- Volume buttons
+
+### PineTab2: doesn't work/known issues
+
+- Everything else
+
+
 ## Instructions
 
 First, setup the webOS ports build directory (see webOS-Ports documentation).
@@ -64,7 +74,7 @@ sudo su
 sudo wic write tmp-glibc/deploy/images/pinephone/luneos-dev-image-pinephone.wic /dev/sdd
 ```
 
-**Note**: for Pinephone Pro, replace pinephone with pinephonepro in all the previous steps.
+**Note**: for Pinephone Pro/PineTab2, replace pinephone with pinephonepro/pinetab2 in all the previous steps.
 
 Please note that it's still a work-in-progress code, and at this stage it's useless to report the tons of
 issues you'll be experiencing with this image.
@@ -74,7 +84,8 @@ issues you'll be experiencing with this image.
 Unless otherwise specified, all content, including all source code files and
 documentation files in this repository are:
 
-Copyright (c) 2019 Christophe Chapuis
+Copyright (c) 2019-2023 Christophe Chapuis
+Copyright (c) 2021-2023 Herman van Hazendonk
 
 Unless otherwise specified or set forth in the NOTICE file, all content,
 including all source code files and documentation files in this repository are:
