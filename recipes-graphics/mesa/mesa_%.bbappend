@@ -6,3 +6,4 @@
 # mesa_%.bbappend:PACKAGECONFIG:append:rk3399 = " kmsro panfrost"
 PACKAGECONFIG:append:pinephone = " kmsro panfrost lima"
 PACKAGECONFIG:append:pinephonepro = " lima"
+PACKAGECONFIG:append:pinetab2 = " lima"
