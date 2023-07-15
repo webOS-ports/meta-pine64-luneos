@@ -1,8 +1,8 @@
-DESCRIPTION = "Various firmware files for Pine64 PinePhone and PinePhonePro"
+DESCRIPTION = "Various firmware files for Pine64 PinePhone, PinePhonePro and PineTab2"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = "file://${WORKDIR}/LICENCE.rtlwifi_firmware.txt;md5=00d06cfd3eddd5a2698948ead2ad54a5"
 
-COMPATIBLE_MACHINE = "pinephonepro|pinephone"
+COMPATIBLE_MACHINE = "pinephonepro|pinephone|pinetab2"
 
 RDEPENDS:${PN} = "wireless-regdb"
 
@@ -13,6 +13,7 @@ SRCREV_wifinonfree = "f713a6054746bc61ece1c8696dce91a7b7e22dd9"
 SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
 
+#FIXME Add firmwares for pinetab2
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan; \
@@ -64,6 +65,17 @@ do_install:append:pinephonepro() {
     install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}/lib/firmware/brcm
     ln -s brcmfmac43456-sdio.txt ${D}/lib/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
 }
+
+do_install:append:pinetab2() {
+	#FIXME Add firmwares for pinetab2
+    install -d ${D}/lib/firmware/rockchip/
+    install -d ${D}/lib/firmware/brcm/
+    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}/lib/firmware/rockchip/dptx.bin
+    install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}/lib/firmware/brcm
+    install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}/lib/firmware/brcm
+    ln -s brcmfmac43456-sdio.txt ${D}/lib/firmware/brcm/brcmfmac43456-sdio.pine64,pinetab2.txt
+}
+
 
 FILES:${PN} = "/lib/firmware"
 
