@@ -7,6 +7,12 @@
 #    20480 KiB + 50 MiB  -> rootfs
 #
 
-part spl --source rawcopy --sourceparams="file=u-boot-sunxi-with-spl.bin" --ondisk mmcblk --no-table --align 8
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label luneos-boot --active --size=100M --align 20480
+# variant with SPL and u-boot
+#part spl --source rawcopy --sourceparams="file=u-boot-sunxi-with-spl.bin" --ondisk mmcblk --no-table --align 8
+#part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label luneos-boot --active --size=100M --align 20480
+#part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --size=1000M --label luneos-rootfs --align 4096 --use-uuid
+
+# variant with systemd-boot
+part /boot --source bootimg-efi --sourceparams="loader=systemd-boot" --ondisk mmcblk0 --label msdos --active --size=100M --align 1024
 part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --size=1000M --label luneos-rootfs --align 4096
+bootloader --ptable gpt --timeout=5 --configfile="boot.conf"
