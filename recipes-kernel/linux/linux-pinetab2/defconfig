@@ -1682,12 +1682,15 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 #
 CONFIG_FW_LOADER=y
 CONFIG_FW_LOADER_DEBUG=y
-CONFIG_EXTRA_FIRMWARE="regulatory.db regulatory.db.p7s edid/asus.bin brcm/brcmfmac43456-sdio.bin brcm/brcmfmac43456-sdio.clm_blob brcm/brcmfmac43456-sdio.txt brcm/brcmfmac43456-sdio.pine64,pinebook-pro.txt brcm/BCM4345C5.hcd brcm/brcmfmac43456-sdio.xunlong,orangepi-3.txt anx7688-fw.bin rtl_bt/rtl8723cs_xx_config.bin rtl_bt/rtl8723cs_xx_fw.bin ov5640_af.bin brcm/brcmfmac43455-sdio.bin brcm/brcmfmac43455-sdio.pine64,pinephone-pro.txt brcm/brcmfmac43455-sdio.clm_blob brcm/BCM4345C0.hcd rockchip/dptx.bin rt2870.bin rtw88/rtw8822c_fw.bin rtw88/rtw8822c_wow_fw.bin rtw89/rtw8852a_fw.bin rtl_nic/rtl8125a-3.fw rtl_nic/rtl8125b-2.fw rtl_nic/rtl8153a-4.fw rtl_nic/rtl8168h-2.fw ap6275p/wifi/fw_bcm43752a2_pcie_ag.bin ap6275p/wifi/nvram_AP6275P.txt ap6275p/wifi/clm_bcm43752a2_pcie_ag.blob bes2600/bes2600_factory.txt bes2600/best2002_fw_boot_sdio.bin bes2600/best2002_fw_sdio.bin bes2600/best2002_fw_sdio_btrf.bin bes2600/best2002_fw_sdio_nosignal.bin"
-CONFIG_EXTRA_FIRMWARE_DIR="/workspace/megous.com/orangepi-pc/firmware"
+CONFIG_FW_LOADER_PAGED_BUF=y
+CONFIG_FW_LOADER_SYSFS=y
+CONFIG_EXTRA_FIRMWARE=""
 # CONFIG_FW_LOADER_USER_HELPER is not set
-# CONFIG_FW_LOADER_COMPRESS is not set
+CONFIG_FW_LOADER_COMPRESS=y
+CONFIG_FW_LOADER_COMPRESS_XZ=y
+CONFIG_FW_LOADER_COMPRESS_ZSTD=y
 CONFIG_FW_CACHE=y
-# CONFIG_FW_UPLOAD is not set
+CONFIG_FW_UPLOAD=y
 # end of Firmware loader
 
 CONFIG_WANT_DEV_COREDUMP=y
