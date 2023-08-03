@@ -10,10 +10,10 @@ SRCREV_kernel = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
 SRCREV_pinerock = "937f0d52d27d7712da6a008d35fd7c2819e2b077"
 SRCREV_ap6256bt = "a30bf312b268eab42d38fab0cc3ed3177895ff5d"
 SRCREV_wifinonfree = "f713a6054746bc61ece1c8696dce91a7b7e22dd9"
+SRCREV_bes2600 = "48d97e9d99fbd4db9c3109e05f71d583f4fb9b34"
 SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
 
-#FIXME Add firmwares for pinetab2
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan; \
@@ -24,6 +24,7 @@ SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE \
     git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
     git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
+    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
   	git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
   	git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
 "
@@ -67,15 +68,13 @@ do_install:append:pinephonepro() {
 }
 
 do_install:append:pinetab2() {
-	#FIXME Add firmwares for pinetab2
     install -d ${D}/lib/firmware/rockchip/
-    install -d ${D}/lib/firmware/brcm/
     install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}/lib/firmware/rockchip/dptx.bin
-    install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}/lib/firmware/brcm
-    install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}/lib/firmware/brcm
-    ln -s brcmfmac43456-sdio.txt ${D}/lib/firmware/brcm/brcmfmac43456-sdio.pine64,pinetab2.txt
+    install -d ${D}/lib/firmware/bes2600/
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}/lib/firmware/best2600
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}/lib/firmware/best2600
+    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}/lib/firmware/best2600
 }
-
 
 FILES:${PN} = "/lib/firmware"
 
