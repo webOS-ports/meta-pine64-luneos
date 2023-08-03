@@ -57,7 +57,6 @@ do_install() {
     install -m 0644 ${WORKDIR}/git/ov5640cam/ov5640_af.bin ${D}/lib/firmware/ov5640_af.bin
 }
 
-
 do_install:append:pinephonepro() {
     install -d ${D}/lib/firmware/rockchip/
     install -d ${D}/lib/firmware/brcm/
@@ -71,9 +70,9 @@ do_install:append:pinetab2() {
     install -d ${D}/lib/firmware/rockchip/
     install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}/lib/firmware/rockchip/dptx.bin
     install -d ${D}/lib/firmware/bes2600/
-    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}/lib/firmware/bes2600
-    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}/lib/firmware/bes2600
-    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}/lib/firmware/bes2600
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}/lib/firmware/bes2600/best2002_fw_boot_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}/lib/firmware/bes2600/best2002_fw_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}/lib/firmware/bes2600/bes2600_factory.txt
 }
 
 FILES:${PN} = "/lib/firmware"
