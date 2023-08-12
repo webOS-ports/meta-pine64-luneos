@@ -9,7 +9,7 @@ DEPENDS = "lvgl lv-drivers"
 SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=master;protocol=https \
     file://0001-recovery-update-for-lvgl-v8.3.0-fbdev_get_sizes-lv_t.patch;patchdir=.. \
 "
-SRCREV = "7a82c1ad1821dcd8b9d0bf0500dae505824ae0e7"
+SRCREV = "6003b1828706c249cccb490e29268c9ec18f262c"
 
 S = "${WORKDIR}/git/recovery"
 
