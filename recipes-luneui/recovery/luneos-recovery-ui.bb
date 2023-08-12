@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://../LICENSE;md5=1ebbd3e34237af26da5dc08a4e440464"
 DEPENDS = "lvgl lv-drivers"
 
 SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=master;protocol=https"
-SRCREV = "7a82c1ad1821dcd8b9d0bf0500dae505824ae0e7"
+SRCREV = "6003b1828706c249cccb490e29268c9ec18f262c"
 
 S = "${WORKDIR}/git/recovery"
 
