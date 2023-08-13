@@ -25,8 +25,8 @@ SRC_URI = " \
     git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
     git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
     git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
-  	git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
-  	git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
+    git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
+    git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
 "
 
 SRC_URI[rtl8723bs_ap_wowlan.sha256sum] = "957707c7d6e01564685a801da1084a60b6b726c3d756d54dbe56ce064110e288"
@@ -47,33 +47,32 @@ do_compile() {
 }
 
 do_install() {
-    install -d ${D}/lib/firmware/rtlwifi/
-    install -m 0644 ${WORKDIR}/rtl8723bs_nic.bin ${D}/lib/firmware/rtlwifi/rtl8723bs_nic.bin
-    install -m 0644 ${WORKDIR}/rtl8723bs_bt.bin ${D}/lib/firmware/rtlwifi/rtl8723bs_bt.bin
-    install -m 0644 ${WORKDIR}/rtl8723bs_wowlan.bin ${D}/lib/firmware/rtlwifi/rtl8723bs_wowlan.bin
-    install -d ${D}/lib/firmware/rtl_bt/
-    install -m 0644 ${WORKDIR}/rtl8723cs_xx_fw.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_fw.bin
-    install -m 0644 ${WORKDIR}/rtl8723cs_xx_config.bin ${D}/lib/firmware/rtl_bt/rtl8723cs_xx_config.bin
-    install -m 0644 ${WORKDIR}/git/ov5640cam/ov5640_af.bin ${D}/lib/firmware/ov5640_af.bin
+    install -d ${D}${nonarch_base_libdir}/firmware/rtlwifi/
+    install -m 0644 ${WORKDIR}/rtl8723bs_nic.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_nic.bin
+    install -m 0644 ${WORKDIR}/rtl8723bs_bt.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_bt.bin
+    install -m 0644 ${WORKDIR}/rtl8723bs_wowlan.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_wowlan.bin
+    install -d ${D}${nonarch_base_libdir}/firmware/rtl_bt/
+    install -m 0644 ${WORKDIR}/rtl8723cs_xx_fw.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_fw.bin
+    install -m 0644 ${WORKDIR}/rtl8723cs_xx_config.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_config.bin
+    install -m 0644 ${WORKDIR}/git/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
 }
 
 do_install:append:pinephonepro() {
-    install -d ${D}/lib/firmware/rockchip/
-    install -d ${D}/lib/firmware/brcm/
-    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}/lib/firmware/rockchip/dptx.bin
-    install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}/lib/firmware/brcm
-    install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}/lib/firmware/brcm
-    ln -s brcmfmac43456-sdio.txt ${D}/lib/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
+    install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
+    install -d ${D}${nonarch_base_libdir}/firmware/brcm/
+    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
+    install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
+    ln -s brcmfmac43456-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
 }
 
 do_install:append:pinetab2() {
-    install -d ${D}/lib/firmware/rockchip/
-    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}/lib/firmware/rockchip/dptx.bin
-    install -d ${D}/lib/firmware/bes2600/
-    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}/lib/firmware/bes2600/best2002_fw_boot_sdio.bin
-    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}/lib/firmware/bes2600/best2002_fw_sdio.bin
-    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}/lib/firmware/bes2600/bes2600_factory.txt
+    install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
+    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
 }
 
-FILES:${PN} = "/lib/firmware"
-
+FILES:${PN} = "${nonarch_base_libdir}/firmware"
