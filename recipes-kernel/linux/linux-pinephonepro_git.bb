@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://${S}/COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 inherit kernel
 require recipes-kernel/linux/linux-yocto.inc
 
-LINUX_VERSION ?= "5.17"
+LINUX_VERSION ?= "6.5"
 LINUX_VERSION_EXTENSION = "-pinephonepro"
 
 PV = "${LINUX_VERSION}-git${SRCPV}"
@@ -14,16 +14,14 @@ PV = "${LINUX_VERSION}-git${SRCPV}"
 KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_KMETA_BRANCH = "yocto-dev"
-SRCREV_machine = "3c21ce2225ed70086783d87f8fbeb2d6026c7034" 
+SRCREV_machine = "7630e0ba0cb79ebcb355ac49c4e24b454eb2b095" 
 SRCREV_meta = "94bfc55e50d9962af2da6d3bc5ee7c205d0df323"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://github.com/megous/linux.git;branch=orange-pi-5.17;protocol=https;name=machine \
+    git://github.com/megous/linux.git;branch=orange-pi-6.5;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
 "
-
-#    git://gitlab.com/pine64-org/linux.git;branch=pine64-kernel-ppp-5.16.y;protocol=https;name=machine 
 
 KBUILD_DEFCONFIG = ""
 
