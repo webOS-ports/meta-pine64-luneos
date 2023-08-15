@@ -28,6 +28,7 @@ SRC_URI = " \
     git://github.com/megous/linux;branch=pt2-6.5;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
+    file://0001-Update-rk3566-pinetab2.dtsi-Use-correct-naming-in-or.patch \
 "
 
 KBUILD_DEFCONFIG = ""
