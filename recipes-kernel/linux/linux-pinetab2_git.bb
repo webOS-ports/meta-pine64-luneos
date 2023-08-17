@@ -21,7 +21,7 @@ LINUX_KMETA_BRANCH = "yocto-dev"
 # SRCREV_machine = "cf58284c0b9966f96b416c979fd47005819d9d7c" 
 # git://github.com/dreemurrs-embedded/linux-pinetab2;nobranch=1;protocol=https;name=machine
 
-SRCREV_machine = "c719e0cb9aa1eeb349f45263c806b81c21f51edb"
+SRCREV_machine = "7630e0ba0cb79ebcb355ac49c4e24b454eb2b095"
 SRCREV_meta = "90961048e63a4ddb3bc70cac6982930ac3b8631f"
 KMETA = "kernel-meta"
 SRC_URI = " \
