@@ -25,7 +25,7 @@ SRCREV_machine = "7630e0ba0cb79ebcb355ac49c4e24b454eb2b095"
 SRCREV_meta = "90961048e63a4ddb3bc70cac6982930ac3b8631f"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://github.com/megous/linux;branch=pt2-6.5;protocol=https;name=machine \
+    git://github.com/megous/linux;branch=orange-pi-6.5;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
     file://0001-Update-rk3566-pinetab2.dtsi-Use-correct-naming-in-or.patch \
