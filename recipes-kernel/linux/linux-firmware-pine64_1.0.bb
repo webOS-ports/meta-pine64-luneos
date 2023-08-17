@@ -16,12 +16,14 @@ SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
 
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan; \
+    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_nic.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_nic.bin;name=rtl8723bs_nic \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_bt.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_bt.bin;name=rtl8723bs_bt \
+    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mediatek/mt7610u.bin?id=${SRCREV_kernel};downloadfilename=mt7610u.bin;name=mt7610u \
     https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_fw.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
-    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_config.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config; \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE \
+    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_config.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
+    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
+    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
     git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
     git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
     git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
@@ -36,7 +38,9 @@ SRC_URI[rtl8723bs_bt.sha256sum] = "774f6628ae2cd7d6d8563cbf88f67f9a95e895cb44b55
 SRC_URI[rtl8723cs_xx_fw.sha256sum] = "c68091565d90c29735bedf72d0bf6590c186ab802ef4fef4caa66ef5af25b870"
 SRC_URI[rtl8723cs_xx_config.sha256sum] = "492531d5a0a44ed5d0e174476543735eafe2cacc5ff5ce9e8e10092d303b563c"
 SRC_URI[ov5640_af.sha256sum] = "439245623bc99f3b0d8c44d47baed3cc17cad01b9191509c89bb8d92a98949c9"
-SRC_URI[LICENSE.sha256sum] = "a61351665b4f264f6c631364f85b907d8f8f41f8b369533ef4021765f9f3b62e"
+SRC_URI[mt7610u.sha256sum] = "5a4268e9021bb587426ba624b425f1e660bfc82cd63b36ad3ce6fb9ce6751760"
+SRC_URI[LICENSE_rtlwifi.sha256sum] = "a61351665b4f264f6c631364f85b907d8f8f41f8b369533ef4021765f9f3b62e"
+SRC_URI[LICENSE_mediatek.sha256sum] = "a90d3f66704d85889945fec5525ea77622549da83aced1aac99828383f8f1805"
 
 S = "${WORKDIR}/git"
 
@@ -73,6 +77,8 @@ do_install:append:pinetab2() {
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio.bin
     install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
+    install -d ${D}${nonarch_base_libdir}/firmware/mediatek/
+    install -m 0644 ${WORKDIR}/mt7610u.bin ${D}${nonarch_base_libdir}/firmware/mediatek/mt7610u.bin
 }
 
 FILES:${PN} = "${nonarch_base_libdir}/firmware"
