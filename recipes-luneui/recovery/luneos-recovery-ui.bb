@@ -15,3 +15,6 @@ inherit cmake
 
 TARGET_CFLAGS += "-DLV_CONF_INCLUDE_SIMPLE=1"
 TARGET_CFLAGS += "-I${RECIPE_SYSROOT}/${includedir}/lvgl -I${RECIPE_SYSROOT}/${includedir}/lvgl/lv_drivers"
+
+# Because meta-pine64-luneos/recipes-graphics/lvgl/lvgl_%.bbappend makes lvgl MACHINE_ARCH as well
+PACKAGE_ARCH = "${MACHINE_ARCH}"
