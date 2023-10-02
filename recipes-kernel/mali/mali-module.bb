@@ -7,7 +7,7 @@ DEPENDS = "virtual/kernel"
 
 inherit module
 
-PV = "1.0.0+git${SRCPV}"
+PV = "1.0.0+git"
 SRCREV = "f736708fb8ad4f244778324009fc703e91487d37"
 
 SRC_URI = "git://github.com/mripard/sunxi-mali.git;branch=master;protocol=https"

@@ -9,7 +9,7 @@ require recipes-kernel/linux/linux-yocto.inc
 LINUX_VERSION ?= "6.3"
 LINUX_VERSION_EXTENSION = "-pinephone"
 
-PV = "${LINUX_VERSION}-git${SRCPV}"
+PV = "${LINUX_VERSION}-git"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 

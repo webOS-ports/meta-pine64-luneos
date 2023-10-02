@@ -8,7 +8,7 @@ RDEPENDS:${PN} = "atinout"
 
 inherit meson systemd pkgconfig
 
-PV = "0.4.2-1+git${SRCPV}"
+PV = "0.4.2-1+git"
 
 SRCREV = "88c68b9933f47f863e6685b2b6502d5d7ed1871c"
 SRC_URI = " \
