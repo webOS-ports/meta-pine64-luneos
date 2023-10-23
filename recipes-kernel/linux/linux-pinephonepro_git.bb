@@ -6,7 +6,9 @@ LIC_FILES_CHKSUM = "file://${S}/COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 inherit kernel
 require recipes-kernel/linux/linux-yocto.inc
 
-LINUX_VERSION ?= "6.5"
+COMPATIBLE_MACHINE = "pinephonepro"
+
+LINUX_VERSION ?= "6.6.0"
 LINUX_VERSION_EXTENSION = "-pinephonepro"
 
 PV = "${LINUX_VERSION}-git${SRCPV}"
@@ -14,11 +16,11 @@ PV = "${LINUX_VERSION}-git${SRCPV}"
 KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_KMETA_BRANCH = "yocto-dev"
-SRCREV_machine = "7630e0ba0cb79ebcb355ac49c4e24b454eb2b095" 
+SRCREV_machine = "9ff6e780db90cde2439980d4da84d6f7d4e3d989" 
 SRCREV_meta = "94bfc55e50d9962af2da6d3bc5ee7c205d0df323"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://github.com/megous/linux.git;branch=orange-pi-6.5;protocol=https;name=machine \
+    git://gitlab.com/ook37/linux.git;branch=okpine-6.6;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
 "
@@ -30,5 +32,3 @@ KBUILD_DEFCONFIG = ""
 # conditional
 DEPENDS += "gmp-native libmpc-native"
 DEPENDS += "libyaml-native libyaml yaml-cpp python3-dtschema-wrapper-native"
-
-COMPATIBLE_MACHINE = "pinephonepro"
