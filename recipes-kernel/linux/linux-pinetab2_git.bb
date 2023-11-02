@@ -8,7 +8,7 @@ require recipes-kernel/linux/linux-yocto.inc
 
 COMPATIBLE_MACHINE = "pinetab2"
 
-LINUX_VERSION ?= "6.6.0"
+LINUX_VERSION ?= "6.5.0"
 LINUX_VERSION_EXTENSION = "-pinetab2"
 
 PV = "${LINUX_VERSION}-git${SRCPV}"
@@ -17,11 +17,11 @@ KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_KMETA_BRANCH = "yocto-dev"
 
-SRCREV_machine = "9ff6e780db90cde2439980d4da84d6f7d4e3d989"
+SRCREV_machine = "232cd3634d1b0d411ecae9e83ab5ab9039779372"
 SRCREV_meta = "90961048e63a4ddb3bc70cac6982930ac3b8631f"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://gitlab.com/ook37/linux.git;branch=okpine-6.6;protocol=https;name=machine \
+    git://gitlab.com/ook37/linux.git;branch=okpine-6.5;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
 "
