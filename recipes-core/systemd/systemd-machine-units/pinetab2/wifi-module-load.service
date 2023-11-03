@@ -7,10 +7,8 @@ After=dbus.service
 [Service]
 Type=simple
 RemainAfterExit=yes
-ExecStart=/sbin/modprobe mac80211
+ExecStart=/sbin/modprobe bes2600
 ExecStartPost=/bin/sleep 2
-ExecStartPost=modprobe bes2600
-ExecStartPost=/bin/sleep 4
 ExecStartPost=/usr/sbin/rfkill unblock wifi
 ExecStop=/sbin/modprobe -r bes2600
 Restart=on-failure
