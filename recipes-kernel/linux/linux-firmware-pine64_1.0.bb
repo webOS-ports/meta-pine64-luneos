@@ -14,6 +14,8 @@ SRCREV_bes2600 = "32894ca7fa1326f364d919955b7f16121588d6ad"
 SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
 
+SRCREV_FORMAT = "pinerock_ap6256bt_wifinonfree_bes2600_ov5640cam"
+
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan \
