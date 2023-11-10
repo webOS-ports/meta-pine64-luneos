@@ -17,11 +17,11 @@ KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_BRANCH = "orange-pi-${LINUX_VERSION}"
 LINUX_KMETA_BRANCH = "yocto-${LINUX_VERSION}"
-SRCREV_machine = "3002fc0dffb52b69b5614bed0b9a85da76dde6e5"
+SRCREV_machine = "08ee78c9dfda5effd34848b6f1ae6ce10c466bad"
 SRCREV_meta = "aeb1ad4a2a72e2acf206fac02da0551fbd29b9d5"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://github.com/megous/linux;protocol=https;branch=${LINUX_BRANCH};name=machine \
+    git://github.com/sailfish-on-dontbeevil/kernel-megi.git;protocol=https;branch=${LINUX_BRANCH};name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://0001-dts-pinephone-drop-modem-power-node.patch \
     file://0002-dts-pinephone-jack-detection.patch \
