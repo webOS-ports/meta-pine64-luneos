@@ -13,9 +13,9 @@ SRC_URI:pinephonepro = " \
     git://github.com/herrie82/u-boot.git;protocol=https;branch=herrie/ppp \
 "
 
-SRCREV:pinetab2 = "c294612d38e5434f549a7f591212249ca190edd3"
+SRCREV:pinetab2 = "81dac0348fb1d1d8279634d1438bf2a88b1ca9b7"
 SRC_URI:pinetab2 = " \
-    git://github.com/Kwiboo/u-boot-rockchip.git;protocol=https;branch=rk3568-2023.07 \
+    git://github.com/Kwiboo/u-boot-rockchip.git;protocol=https;branch=rk3568-2023.07.02 \
     file://rk3568_bl31_v1.42.elf \
     file://rk3566_ddr_1056MHz_v1.18.bin \
 "
