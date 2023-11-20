@@ -3,15 +3,15 @@ FILESEXTRAPATHS:prepend:pinephonepro := "${THISDIR}/files:"
 FILESEXTRAPATHS:prepend:pinetab2 := "${THISDIR}/files:"
 
 LIC_FILES_CHKSUM:pinephone = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
-LIC_FILES_CHKSUM:pinephonepro = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
+LIC_FILES_CHKSUM:pinephonepro = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 LIC_FILES_CHKSUM:pinetab2 = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
-PV:pinephonepro ="2021.10"
+PV:pinephonepro ="2023.07"
 PV:pinetab2 ="2023.07"
 
-SRCREV:pinephonepro = "eaf7654d278c8c08653690e0e5a4c24ca0e705a9"
+SRCREV:pinephonepro = "222aa75acee7f4140a2ca5c502e536419d4ff735"
 SRC_URI:pinephonepro = " \
-    git://github.com/herrie82/u-boot.git;protocol=https;branch=herrie/ppp \
+    git://xff.cz/git/u-boot;protocol=https;branch=ppp-2023.07 \
 "
 
 SRCREV:pinetab2 = "81dac0348fb1d1d8279634d1438bf2a88b1ca9b7"
@@ -28,7 +28,7 @@ SRC_URI:append:pinephone = " \
 UBOOT_MAKE_TARGET:pinephone = "pinephone_defconfig all"
 
 DEPENDS:append:pinephone = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
-DEPENDS:append:pinephonepro = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
+DEPENDS:append:pinephonepro = " trusted-firmware-a u-boot-tools-native python3-setuptools-native python3-pyelftools-native"
 DEPENDS:append:pinetab2 = " u-boot-tools-native python3-setuptools-native python3-pyelftools-native"
 DEPENDS:append:pinephone = " crust-firmware"
 
