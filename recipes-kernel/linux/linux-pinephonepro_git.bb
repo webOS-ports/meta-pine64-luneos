@@ -16,13 +16,17 @@ PV = "${LINUX_VERSION}-git${SRCPV}"
 KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_KMETA_BRANCH = "yocto-dev"
-SRCREV_machine = "74f475b7e66d84693a126b257063f53a0f55c911" 
+SRCREV_machine = "309ad54d4c29193d272ed0b3903718b9a241c8b3" 
 SRCREV_meta = "94bfc55e50d9962af2da6d3bc5ee7c205d0df323"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://github.com/sailfish-on-dontbeevil/kernel-megi.git;branch=orange-pi-6.5;protocol=https;name=machine \
+    git://github.com/herrie82/kernel-megi.git;branch=herrie/LuneOS-6.5;protocol=https;name=machine \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
+    file://0001-dts-pinephone-pro-add-modem-ri.patch \
+    file://0002-dts-pinephone-pro-remove-modem-node.patch \
+    file://0003-Revert-usb-quirks-Add-USB_QUIRK_RESET-for-Quectel-EG25G-Modem.patch \
+    file://0004-usb-serial-option-add-reset-resume-callback-for-WWAN.patch \
 "
 
 KBUILD_DEFCONFIG = ""
