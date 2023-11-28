@@ -3,3 +3,22 @@ SUBSYSTEMS=="usb", ENV{.LOCAL_ifNum}="$attr{bInterfaceNumber}"
 SUBSYSTEMS=="usb", KERNEL=="ttyUSB[0-9]*", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.LOCAL_ifNum}=="01", SYMLINK+="EG25.NMEA", MODE="0660"
 SUBSYSTEMS=="usb", KERNEL=="ttyUSB[0-9]*", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.LOCAL_ifNum}=="02", SYMLINK+="EG25.AT", MODE="0660"
 SUBSYSTEMS=="usb", KERNEL=="ttyUSB[0-9]*", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.LOCAL_ifNum}=="03", SYMLINK+="EG25.MODEM", MODE="0660"
+
+ACTION=="add", SUBSYSTEM=="usb", DRIVERS=="usb", ENV{DEVTYPE}=="usb_device", GOTO="eg25_start"
+GOTO="eg25_end"
+
+# Default attributes values
+LABEL="eg25_start"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ATTR{power/control}="auto"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ATTR{power/autosuspend_delay_ms}="3000"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ATTR{power/wakeup}="enabled"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ATTR{power/persist}="0"
+
+# power/control needs to be "on" for the community-maintained firmware
+ATTRS{serial}=="community_fw", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ATTR{power/control}="on"
+
+# Special trick for the PinePhone Pro: set power/persist to 1 *only* with the community FW
+# We can identify the PPP by looking for the string "pinephone-pro" in the device tree "compatible" property
+ATTRS{serial}=="community_fw", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", PROGRAM=="/bin/grep pine64,pinephone-pro /proc/device-tree/compatible", ATTR{power/persist}="1"
+
+LABEL="eg25_end"
