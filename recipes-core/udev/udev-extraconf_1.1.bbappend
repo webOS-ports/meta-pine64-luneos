@@ -12,6 +12,7 @@ SRC_URI:append:pinephone = " \
 "
 
 SRC_URI:append:pinephonepro = " \
+                            file://pinephonepro/10-proximity.rules \
                             file://pinephonepro/90-modem-eg25.rules \
 "
 
