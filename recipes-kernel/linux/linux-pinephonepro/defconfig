@@ -847,11 +847,35 @@ CONFIG_IP_NF_ARPTABLES=y
 CONFIG_IP_NF_ARP_MANGLE=y
 
 
+# Required as per https://gitlab.com/postmarketOS/pmbootstrap/-/blob/master/pmb/config/__init__.py?ref_type=heads#L357
+# Missing LXC/Docker config as per lxc-checkconfig and https://gitlab.com/postmarketOS/pmbootstrap/-/blob/master/pmb/config/__init__.py?ref_type=heads#L464:
+# As per https://wiki.archlinux.org/title/Anbox#Building_a_kernel needed for both Waydroid and Anbox
+
 #Waydroid
 CONFIG_ANDROID_BINDER_IPC=y
 CONFIG_ANDROID_BINDERFS=y
 CONFIG_ANDROID_BINDER_DEVICES="binder,hwbinder,vndbinder"
 CONFIG_NETFILTER_XT_TARGET_CHECKSUM=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+CONFIG_SW_SYNC=y
+CONFIG_UHID=y
+CONFIG_CGROUP_DEBUG=y
+CONFIG_EXPERT=y
+CONFIG_BRIDGE_VLAN_FILTERING=y
+CONFIG_PSI_DEFAULT_DISABLED=n
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_NETFILTER_XT_MATCH_IPVS=y
+CONFIG_RT_GROUP_SCHED=y
+CONFIG_IP_VS=y
+CONFIG_IP_VS_NFCT=y
+CONFIG_IP_VS_PROTO_TCP=y
+CONFIG_IP_VS_PROTO_UDP=y
+CONFIG_IP_VS_RR=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_DM_THIN_PROVISIONING=y
+CONFIG_VXLAN=y
+CONFIG_IPVLAN=y
+CONFIG_MACVLAN=y
 
 #Modem
 CONFIG_USB_NET_QMI_WWAN=m
