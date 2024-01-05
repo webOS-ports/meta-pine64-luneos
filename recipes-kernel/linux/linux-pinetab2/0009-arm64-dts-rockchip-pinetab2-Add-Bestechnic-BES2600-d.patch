@@ -1,0 +1,65 @@
+From 7c0d4f04745de1fa4b22b3c11da779c22dce8b9c Mon Sep 17 00:00:00 2001
+From: Danct12 <danct12@disroot.org>
+Date: Thu, 4 Jan 2024 11:49:43 +0000
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: Add Bestechnic BES2600 device
+ node
+
+---
+Upstream-Status: Pending
+
+ .../dts/rockchip/rk3566-pinetab2-v2.0.dts     |  8 +++++++
+ .../boot/dts/rockchip/rk3566-pinetab2.dtsi    | 22 +++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+index d0dca14bc2ae..759541eb0e6d 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+@@ -19,6 +19,14 @@ sdio_pwrkey: sdio-pwrkey {
+ 	};
+ };
+ 
++/*
++ * This GPIO is claimed by sdio_pwrkey, it's better to move the power/reset function
++ * to the bootloader instead so that the Linux can use it.
++ */
++//&bes2600 {
++//	power-gpios = <&gpio3 RK_PD3 GPIO_ACTIVE_HIGH>;
++//};
++
+ &gpio_keys {
+ 	pinctrl-0 = <&kb_id_det>, <&hall_int_l>;
+ 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+index 672a6bf40fe2..c0de01d50477 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -968,6 +968,28 @@ &sdmmc1_cmd
+ 	vmmc-supply = <&vcc_wl>;
+ 	vqmmc-supply = <&vcca1v8_pmu>;
+ 	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	bes2600: bes2600@0 {
++		compatible = "bestechnic,bes2600-sdio";
++		reg = <0>;
++
++		/*
++		 * The reset pin does not appear to be used in the latest driver drop by
++		 * Bestechnic. However, it is on the schematic but unfortunately wasn't
++		 * being used by Pine64.
++		 *
++		 * It doesn't hurt to configure it though, in case if they make use of
++		 * it in the near future.
++		 */
++		/* The reset pin is claimed by sdio_mmcseq, It's better to move it to U-Boot
++		 * so the OS can use it.
++		 */
++		//reset-gpios = <&gpio3 RK_PD2 GPIO_ACTIVE_LOW>;
++		wakeup-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_LOW>;
++		host-wakeup-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &sfc {
