@@ -10,7 +10,7 @@ SRCREV_kernel = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
 SRCREV_pinerock = "937f0d52d27d7712da6a008d35fd7c2819e2b077"
 SRCREV_ap6256bt = "a30bf312b268eab42d38fab0cc3ed3177895ff5d"
 SRCREV_wifinonfree = "f713a6054746bc61ece1c8696dce91a7b7e22dd9"
-SRCREV_bes2600 = "32894ca7fa1326f364d919955b7f16121588d6ad"
+SRCREV_bes2600 = "7a305de61771a84f1264866b204cf172df6d9195"
 SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
 
@@ -28,7 +28,7 @@ SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
     git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
     git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
-    git://github.com/herrie82/bes2600-firmware.git;branch=0.3.10_2022.1125;protocol=https;name=bes2600;destsuffix=git/bes2600 \
+    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
     git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
     git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
 "
@@ -76,11 +76,11 @@ do_install:append:pinetab2() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
     install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
-    install -m 0644 ${S}/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
-    install -m 0644 ${S}/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
-    install -m 0644 ${S}/bes2600/best2002_fw_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio.bin
-    install -m 0644 ${S}/bes2600/best2002_fw_sdio_btrf.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_btrf.bin
-    install -m 0644 ${S}/bes2600/best2002_fw_sdio_nosignal.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_nosignal.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio_btrf.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_btrf.bin
+    install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio_nosignal.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_nosignal.bin
     install -d ${D}${nonarch_base_libdir}/firmware/mediatek/
     install -m 0644 ${WORKDIR}/mt7610u.bin ${D}${nonarch_base_libdir}/firmware/mediatek/mt7610u.bin
 }
