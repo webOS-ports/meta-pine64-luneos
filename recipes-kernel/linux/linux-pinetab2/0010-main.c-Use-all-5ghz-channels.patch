@@ -1,0 +1,51 @@
+From ebd4c514f62397c608d37332764b8704d7fd634d Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Thu, 11 Jan 2024 11:23:25 +0100
+Subject: [PATCH] main.c: Use all 5ghz channels
+
+We're not in China, so we want to use all 5ghz channels.
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+Upstream-Status: Pending
+
+ drivers/staging/bes2600/main.c | 19 -------------------
+ 1 file changed, 19 deletions(-)
+
+diff --git a/drivers/staging/bes2600/main.c b/drivers/staging/bes2600/main.c
+index 4a23cdf39740..f7cb35ddab74 100644
+--- a/drivers/staging/bes2600/main.c
++++ b/drivers/staging/bes2600/main.c
+@@ -153,7 +153,6 @@ static struct ieee80211_channel bes2600_2ghz_chantable[] = {
+ };
+ 
+ #ifdef CONFIG_BES2600_5GHZ_SUPPORT
+-#if 0
+ static struct ieee80211_channel bes2600_5ghz_chantable[] = {
+ 	CHAN5G(34, 0),		CHAN5G(36, 0),
+ 	CHAN5G(38, 0),		CHAN5G(40, 0),
+@@ -175,24 +174,6 @@ static struct ieee80211_channel bes2600_5ghz_chantable[] = {
+ 	CHAN5G(208, 0),		CHAN5G(212, 0),
+ 	CHAN5G(216, 0),
+ };
+-#else
+-/* comply with china regulation on 5G */
+-static struct ieee80211_channel bes2600_5ghz_chantable[] = {
+-	CHAN5G(36, 0),
+-	CHAN5G(40, 0),
+-	CHAN5G(44, 0),
+-	CHAN5G(48, 0),
+-	CHAN5G(52, 0),
+-	CHAN5G(56, 0),
+-	CHAN5G(60, 0),
+-	CHAN5G(64, 0),
+-	CHAN5G(149, 0),
+-	CHAN5G(153, 0),
+-	CHAN5G(157, 0),
+-	CHAN5G(161, 0),
+-	CHAN5G(165, 0),
+-};
+-#endif
+ #endif
+ 
+ static struct ieee80211_supported_band bes2600_band_2ghz = {
