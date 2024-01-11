@@ -33,6 +33,8 @@ SRC_URI = " \
     file://0007-drivers-staging-bes2600-Use-device-tree-for-platform.patch \
     file://0008-drivers-staging-bes2600-Use-lib-firmware-bes2600-for.patch \
     file://0009-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
+    file://0010-main.c-Use-all-5ghz-channels.patch \
+    file://0011-Try-fixing-kernel-compilation-issue.patch \
 "
 
 KBUILD_DEFCONFIG = ""
