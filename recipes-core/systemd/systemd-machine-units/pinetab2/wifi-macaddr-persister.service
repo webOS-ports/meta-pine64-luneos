@@ -1,0 +1,11 @@
+[Unit]
+Description=Saving WiFi MAC Addr on first boot
+After=wifi-module-load.service
+Requires=wifi-module-load.service
+
+[Service]
+Type=oneshot
+ExecStart=/lib/systemd/system/scripts/persist-wifi-mac-addr.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -343,7 +343,7 @@ index 000000000000..ac738cb447d3
 +#2.read from file(macaddr of customers)
 +#3.read from file(macaddr template)
 +#4.random macaddr
-+GET_MAC_ADDR_METHOD                     ?= 4
++GET_MAC_ADDR_METHOD                     ?= 2
 +
 +ifeq ($(CONFIG_BES2600_DEBUGFS),y)
 +BES2600_DUMP_FW_DPD_LOG                 ?= n
@@ -24810,7 +24810,7 @@ index 000000000000..4a23cdf39740
 +
 +#if (GET_MAC_ADDR_METHOD == 2) /* To use macaddr and PS Mode of customers */
 +#ifndef PATH_WIFI_MACADDR
-+#define PATH_WIFI_MACADDR		"/efs/wifi/.mac.info"
++#define PATH_WIFI_MACADDR		"/persist/wifi/.macaddr"
 +#endif
 +#elif (GET_MAC_ADDR_METHOD == 3)
 +#define PATH_WIFI_MACADDR_TMP	"/data/.mac.info"
