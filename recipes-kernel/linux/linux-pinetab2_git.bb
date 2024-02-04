@@ -35,6 +35,7 @@ SRC_URI = " \
     file://0009-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
     file://0010-main.c-Use-all-5ghz-channels.patch \
     file://0011-Try-fixing-kernel-compilation-issue.patch \
+    file://0012-Patch-linux-framebuffer-logo-for-LuneOS.patch \
 "
 
 KBUILD_DEFCONFIG = ""
