@@ -1,0 +1,41 @@
+From ab7cfc6d7ffb881632132a82f4761dfd3b4a998e Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Tue, 6 Feb 2024 06:01:51 +0100
+Subject: [PATCH] bes2600: Use fixed mac address hack
+
+Pending a more proper solution.
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+Upstream-Status: Pending
+
+ drivers/staging/bes2600/Makefile | 2 +-
+ drivers/staging/bes2600/main.c   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/bes2600/Makefile b/drivers/staging/bes2600/Makefile
+index 42a00269d01a..a23415ea8c6c 100644
+--- a/drivers/staging/bes2600/Makefile
++++ b/drivers/staging/bes2600/Makefile
+@@ -59,7 +59,7 @@ BES2600_FASTPS_IDLE_TIME		?= 8
+ #2.read from file(macaddr of customers)
+ #3.read from file(macaddr template)
+ #4.random macaddr
+-GET_MAC_ADDR_METHOD                     ?= 4
++GET_MAC_ADDR_METHOD                     ?= 2
+ 
+ ifeq ($(CONFIG_BES2600_DEBUGFS),y)
+ BES2600_DUMP_FW_DPD_LOG                 ?= n
+diff --git a/drivers/staging/bes2600/main.c b/drivers/staging/bes2600/main.c
+index c156e19eb334..85b43a5de914 100644
+--- a/drivers/staging/bes2600/main.c
++++ b/drivers/staging/bes2600/main.c
+@@ -55,7 +55,7 @@ static u8 bes2600_mac_template[ETH_ALEN] = {
+ 
+ #if (GET_MAC_ADDR_METHOD == 2) /* To use macaddr and PS Mode of customers */
+ #ifndef PATH_WIFI_MACADDR
+-#define PATH_WIFI_MACADDR		"/efs/wifi/.mac.info"
++#define PATH_WIFI_MACADDR		"/persist/wifi/.macaddr"
+ #endif
+ #elif (GET_MAC_ADDR_METHOD == 3)
+ #define PATH_WIFI_MACADDR_TMP	"/data/.mac.info"
