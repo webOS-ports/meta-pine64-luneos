@@ -5,6 +5,8 @@ Subject: [PATCH] arm64: dts: rk3399-pinephone-pro: Remove modem node
 
 Since we don't use modem-power driver, this can be removed
 for eg25-manager.
+
+Upstream-Status: Pending
 ---
  .../dts/rockchip/rk3399-pinephone-pro.dts     | 40 +------------------
  1 file changed, 2 insertions(+), 38 deletions(-)

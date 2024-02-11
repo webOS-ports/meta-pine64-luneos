@@ -11,6 +11,8 @@ This is part of a larger patch:
 https://github.com/Quectel-Community/meta-quectel-community/commit/24adef2128f79b4d31490634438a917b3df462e2#diff-45dc5960ca2f1ef57139fe751587b3b043de9cca5864e2801210c00e75bd0780
 
 However the rest of the patch is not needed/already upstreamed.
+
+Upstream-Status: Pending
 ---
  drivers/usb/serial/option.c | 1 +
  1 file changed, 1 insertion(+)
