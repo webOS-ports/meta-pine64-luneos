@@ -5,6 +5,8 @@ Subject: [PATCH] Revert "usb: quirks: Add USB_QUIRK_RESET for Quectel EG25G
  Modem"
 
 This reverts commit 62867934f6251349e1352a345f827ba8de514a36.
+
+Upstream-Status: Pending
 ---
  drivers/usb/core/quirks.c | 3 ---
  1 file changed, 3 deletions(-)
