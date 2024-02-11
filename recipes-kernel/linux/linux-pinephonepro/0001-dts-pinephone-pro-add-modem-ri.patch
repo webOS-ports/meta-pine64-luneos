@@ -6,6 +6,8 @@ Subject: [PATCH 3/4] arm64: dts: rk3399-pinephone-pro: add modem RI pin
 Taht way the modem can wake the phone on incoming calls/messages.
 
 Signed-off-by: Arnaud Ferraris <arnaud.ferraris@gmail.com>
+
+Upstream-Status: Pending
 ---
  .../dts/rockchip/rk3399-pinephone-pro.dts     | 19 +++++++++++++++++++
  1 file changed, 19 insertions(+)
