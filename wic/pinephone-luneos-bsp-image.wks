@@ -15,4 +15,4 @@
 # variant with systemd-boot
 part /boot --source bootimg-efi --sourceparams="loader=systemd-boot" --ondisk mmcblk0 --label boot-efi --active --size=100M --align 1024 --use-uuid
 part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --size=1000M --label luneos-rootfs --align 4096
-bootloader --ptable gpt --timeout=2 --configfile="boot.conf"
+bootloader --ptable gpt --timeout=2 --configfile="pinephone-boot.conf"
