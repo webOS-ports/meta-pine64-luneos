@@ -26,7 +26,6 @@ SRC_URI:append:pinephone = " \
     file://0001-pinephone-Add-volume_key-environment-variable.patch \
 "
 UBOOT_MAKE_TARGET:pinephone = "pinephone_defconfig all"
-UBOOT_MAKE_TARGET:pinetab2 = "pinetab2-rk3566_defconfig all"
 EXTRA_OEMAKE:append:pinetab2 = " EXTRAVERSION=1 BL31=${WORKDIR}/rk3568_bl31_v1.42.elf ROCKCHIP_TPL=${WORKDIR}/rk3566_ddr_1056MHz_v1.18.bin"
 
 DEPENDS:append:pinephone = " trusted-firmware-a u-boot-tools-native python3-setuptools-native"
