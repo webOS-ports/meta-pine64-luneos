@@ -2,4 +2,12 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${BPN}:"
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 
-SRC_URI += " file://0001-lv_conf_template.h-Patch-for-LuneOS.patch"
+PACKAGECONFIG += "fbdev"
+
+LVGL_CONFIG_LV_MEM_SIZE             = "(1024U * 1024U)"
+LVGL_CONFIG_LV_USE_LOG              = "1"
+LVGL_CONFIG_LV_LOG_LEVEL            = "LV_LOG_LEVEL_INFO"
+LVGL_CONFIG_LV_LOG_PRINTF           = "1"
+LVGL_CONFIG_LV_USE_FONT_COMPRESSED  = "1"
+LVGL_CONFIG_LV_THEME_DEFAULT_DARK   = "1"
+
