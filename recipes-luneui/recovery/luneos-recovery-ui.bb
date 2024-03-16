@@ -8,14 +8,15 @@ DEPENDS = "lvgl"
 
 SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=lvgl-9.0;protocol=https \
 "
-SRCREV = "d9973a191e249d5ee436072c405da0433882e4c7"
+SRCREV = "fed0dccbfdc27db9b69a352fddfca49cf66620ba"
 
 S = "${WORKDIR}/git/recovery"
 
 inherit cmake
 
-TARGET_CFLAGS += "-DLV_CONF_INCLUDE_SIMPLE=1"
-TARGET_CFLAGS += "-I${RECIPE_SYSROOT}/${includedir}/lvgl"
+TARGET_CFLAGS:append = " -DLV_CONF_INCLUDE_SIMPLE=1 -I${RECIPE_SYSROOT}/${includedir}/lvgl"
+
+TARGET_CFLAGS:pinetab2:append = " -DEMMC_PATH='\"/dev/mmcblk1\"'"
 
 # Because meta-pine64-luneos/recipes-graphics/lvgl/lvgl_%.bbappend makes lvgl MACHINE_ARCH as well
 PACKAGE_ARCH = "${MACHINE_ARCH}"
