@@ -1,0 +1,102 @@
+From 3f6a13c13996e90cfe8bafa5dc6cd10b6c86f127 Mon Sep 17 00:00:00 2001
+From: Jenkins <kernel.org@herrie.org>
+Date: Fri, 12 Apr 2024 12:44:23 +0200
+Subject: [PATCH] BES2600: Fix buid with 6.9 kernel
+
+Needed after:
+https://github.com/torvalds/linux/commit/6092077ad09ce880c61735c314060f0bd79ae4aa and https://github.com/torvalds/linux/commit/0a44dfc070749514b804ccac0b1fd38718f7daa1
+
+Upstream-Status: Pending [https://github.com/cringeops/bes2600/pull/14]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ bes2600/ap.c       | 8 ++++----
+ bes2600/main.c     | 4 ++++
+ bes2600/sta.c      | 8 ++++----
+ bes2600/txrx_opt.c | 6 +++---
+ 4 files changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/bes2600/ap.c b/bes2600/ap.c
+index 61c0cb6..e0cebf9 100644
+--- a/bes2600/ap.c
++++ b/bes2600/ap.c
+@@ -658,7 +658,7 @@ void bes2600_bss_info_changed(struct ieee80211_hw *dev,
+ 					bes2600_rate_mask_to_wsm(hw_priv,
+ 					sta->deflink.supp_rates[hw_priv->channel->band]));
+ 				rcu_read_unlock();
+-				ch_type = cfg80211_get_chandef_type(&info->chandef);
++				ch_type = cfg80211_get_chandef_type(&info->chanreq.oper);
+ 				bes_devel("[STA] ch %d, type: %d, HT oper mode: %d\n",
+ 					  hw_priv->channel->hw_value,
+ 					  ch_type, info->ht_operation_mode);
+@@ -969,7 +969,7 @@ void bes2600_bss_info_changed(struct ieee80211_hw *dev,
+ 	}
+ 
+ 	if (changed & BSS_CHANGED_BANDWIDTH) {
+-		enum nl80211_channel_type ch_type = cfg80211_get_chandef_type(&info->chandef);
++		enum nl80211_channel_type ch_type = cfg80211_get_chandef_type(&info->chanreq.oper);
+ 
+ 		if (cfg->assoc &&
+ 		    hw_priv->ht_info.channel_type != ch_type &&
+@@ -1548,7 +1548,7 @@ static int bes2600_start_ap(struct bes2600_vif *priv)
+ 	};
+ 
+ 	struct wsm_switch_channel channel = {
+-		.channelMode = (cfg80211_get_chandef_type(&conf->chandef)) << 4,
++		.channelMode = (cfg80211_get_chandef_type(&conf->chanreq.oper)) << 4,
+ 		.channelSwitchCount = 0,
+ 		.newChannelNumber = hw_priv->channel->hw_value,
+ 	};
+@@ -1560,7 +1560,7 @@ static int bes2600_start_ap(struct bes2600_vif *priv)
+ 
+ 	if (priv->vif->p2p) {
+ 		start_dhcpd();
+-		hw_priv->ht_info.channel_type = cfg80211_get_chandef_type(&conf->chandef);
++		hw_priv->ht_info.channel_type = cfg80211_get_chandef_type(&conf->chanreq.oper);
+ 	}
+ 
+ 	if (priv->if_id)
+diff --git a/bes2600/main.c b/bes2600/main.c
+index ea6ba0a..82b2e5e 100644
+--- a/bes2600/main.c
++++ b/bes2600/main.c
+@@ -216,6 +216,10 @@ static const struct ieee80211_iface_combination bes2600_if_comb[] = {
+ 
+ 
+ static const struct ieee80211_ops bes2600_ops = {
++	.add_chanctx = ieee80211_emulate_add_chanctx,
++	.remove_chanctx = ieee80211_emulate_remove_chanctx,
++	.change_chanctx = ieee80211_emulate_change_chanctx,
++	.switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx,
+ 	.start			= bes2600_start,
+ 	.stop			= bes2600_stop,
+ 	.add_interface		= bes2600_add_interface,
+diff --git a/bes2600/sta.c b/bes2600/sta.c
+index 91d636d..83249a6 100644
+--- a/bes2600/sta.c
++++ b/bes2600/sta.c
+@@ -547,7 +547,7 @@ int bes2600_config(struct ieee80211_hw *dev, u32 changed)
+ 		bes_devel("Output power --%d\n",hw_priv->output_power);
+ #ifdef CONFIG_BES2600_TESTMODE
+ 		/* Testing if Power Level to set is out of device power range */
+-		if (conf->chandef.chan->band == NL80211_BAND_2GHZ) {
++		if (conf->chanreq.oper.chan->band == NL80211_BAND_2GHZ) {
+ 			max_power_level = hw_priv->txPowerRange[0].max_power_level;
+ 			min_power_level = hw_priv->txPowerRange[0].min_power_level;
+ 		} else {
+diff --git a/bes2600/txrx_opt.c b/bes2600/txrx_opt.c
+index 2a26f73..e792603 100644
+--- a/bes2600/txrx_opt.c
++++ b/bes2600/txrx_opt.c
+@@ -481,9 +481,9 @@ static int bes2600_set_txrx_opt_default_param(struct bes2600_common * hw_priv)
+ 	if (priv->join_status == BES2600_JOIN_STATUS_STA) {
+ 		sta = ieee80211_find_sta(priv->vif, priv->vif->bss_conf.bssid);
+ 		if (sta->deflink.ht_cap.ht_supported &&
+-		    ((priv->vif->bss_conf.chandef.width == NL80211_CHAN_WIDTH_20 &&
++		    ((priv->vif->bss_conf.chanreq.oper.width == NL80211_CHAN_WIDTH_20 &&
+ 			 sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_20) ||
+-			(priv->vif->bss_conf.chandef.width == NL80211_CHAN_WIDTH_40 &&
++			(priv->vif->bss_conf.chanreq.oper.width == NL80211_CHAN_WIDTH_40 &&
+ 			 sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_40))) {
+ 			bes_devel( "open short gi tx\n");
+ 			bes2600_enable_tx_shortgi(hw_priv, priv, 1);

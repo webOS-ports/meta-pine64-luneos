@@ -1,4 +1,4 @@
-From d2e7348139863084e946271ba42995b37f608a92 Mon Sep 17 00:00:00 2001
+From dfdd811a9c350e44c403f4f54239cce17d05ff3b Mon Sep 17 00:00:00 2001
 From: Alexander Warnecke <awarnecke002@hotmail.com>
 Date: Thu, 29 Jun 2023 19:52:42 +1000
 Subject: [PATCH] power: supply: rk817: Fix battery capacity sanity check
@@ -20,7 +20,7 @@ Upstream-Status: Pending
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/power/supply/rk817_charger.c b/drivers/power/supply/rk817_charger.c
-index f64daf5a41d9..f0afc9daa855 100644
+index 7ca91739c6cc..44af88045ac1 100644
 --- a/drivers/power/supply/rk817_charger.c
 +++ b/drivers/power/supply/rk817_charger.c
 @@ -715,7 +715,7 @@ static int rk817_read_battery_nvram_values(struct rk817_charger *charger)
