@@ -1,0 +1,25 @@
+From d61e043fb01cd5066d07318c26a074dddd50a5bf Mon Sep 17 00:00:00 2001
+From: Christophe Chapuis <chris.chapuis@gmail.com>
+Date: Sat, 13 Apr 2024 17:38:37 +0000
+Subject: [PATCH] Fix build with Linux 6.6.9
+
+Upstream-Status: Inappropriate [LuneOS specific]
+
+Signed-off-by: Christophe Chapuis <chris.chapuis@gmail.com>
+---
+ bes2600/txrx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bes2600/txrx.c b/bes2600/txrx.c
+index ff33f0b..676a216 100644
+--- a/bes2600/txrx.c
++++ b/bes2600/txrx.c
+@@ -1485,7 +1485,7 @@ void bes2600_skb_dtor(struct bes2600_common *hw_priv,
+ 			/* The interface may be already removed */
+ 			bes2600_tx_status(priv, skb);
+ 		}
+-		ieee80211_tx_status_skb(hw_priv->hw, skb);
++		ieee80211_tx_status(hw_priv->hw, skb);
+ 	}
+ 
+ }
