@@ -1,21 +1,20 @@
-From 1ac28c1cd227e6324fbaa78f1422acb80783a108 Mon Sep 17 00:00:00 2001
-From: Danct12 <danct12@disroot.org>
-Date: Thu, 4 Jan 2024 14:35:09 +0700
-Subject: [PATCH] arm64: dts: rockchip: pinetab2: Apply BES changes
+From 679e5ced7b52858ca1b65df54d16f37f9a112d3c Mon Sep 17 00:00:00 2001
+From: Jenkins <kernel.org@herrie.org>
+Date: Fri, 12 Apr 2024 09:18:31 +0200
+Subject: [PATCH] rk3566-pinetab2.dtsi: Add required bits for WiFi
 
 ---
 Upstream-Status: Pending
-
  .../dts/rockchip/rk3566-pinetab2-v0.1.dts     |  2 +-
- .../dts/rockchip/rk3566-pinetab2-v2.0.dts     | 18 +++++++++-
- .../boot/dts/rockchip/rk3566-pinetab2.dtsi    | 33 +++++++++++++++++++
- 3 files changed, 51 insertions(+), 2 deletions(-)
+ .../dts/rockchip/rk3566-pinetab2-v2.0.dts     | 17 +++++-
+ .../boot/dts/rockchip/rk3566-pinetab2.dtsi    | 60 +++++++++++++++++++
+ 3 files changed, 77 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v0.1.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v0.1.dts
-index 8b110186a3eb..77f88d06baca 100644
+index 5fe6ca5da9d3..615ae72c6e3f 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v0.1.dts
 +++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v0.1.dts
-@@ -22,5 +22,5 @@ lcd0_rst_l: lcd0-rst-l {
+@@ -24,5 +24,5 @@ lcd0_rst_l: lcd0-rst-l {
  };
  
  &sdmmc1 {
@@ -23,28 +22,26 @@ index 8b110186a3eb..77f88d06baca 100644
 +	mmc-pwrseq = <&sdio_pwrseq>;
  };
 diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
-index 80b18dfbf2ed..d0dca14bc2ae 100644
+index 9349541cbbd0..c2ef019d9b1c 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
 +++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
-@@ -7,6 +7,16 @@
- / {
- 	model = "Pine64 PineTab2 v2.0";
+@@ -9,6 +9,14 @@ / {
  	compatible = "pine64,pinetab2-v2.0", "pine64,pinetab2", "rockchip,rk3566";
-+
-+	sdio_pwrkey: sdio-pwrkey {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rk817 1>;
-+		clock-names = "ext_clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pwrkey>;
-+		reset-gpios = <&gpio3 RK_PD3 GPIO_ACTIVE_HIGH>;
-+		post-power-on-delay-ms = <500>;
-+	};
  };
  
++/*
++ * This GPIO is claimed by sdio_pwrkey, it's better to move the power/reset function
++ * to the bootloader instead so that the Linux can use it.
++ */
++//&bes2600 {
++//	power-gpios = <&gpio3 RK_PD3 GPIO_ACTIVE_HIGH>;
++//};
++
  &gpio_keys {
-@@ -39,8 +49,14 @@ lcd0_rst_l: lcd0-rst-l {
- 			rockchip,pins = <0 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
+ 	pinctrl-0 = <&kb_id_det>, <&hall_int_l>;
+ 
+@@ -41,8 +49,15 @@ hall_int_l: hall-int-l {
+ 			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
  		};
  	};
 +
@@ -53,17 +50,18 @@ index 80b18dfbf2ed..d0dca14bc2ae 100644
 +			rockchip,pins = <3 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
 +		};
 +	};
++
  };
  
  &sdmmc1 {
 -	vmmc-supply = <&vcc_sys>;
-+	mmc-pwrseq = <&sdio_pwrseq &sdio_pwrkey>;
++	mmc-pwrseq = <&sdio_pwrseq>;
  };
 diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
-index dbc6fbbfd9fb..672a6bf40fe2 100644
+index db40281eafbe..d10a614b2042 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
-@@ -171,6 +171,16 @@ simple-audio-card,codec {
+@@ -134,6 +134,16 @@ simple-audio-card,codec {
  		};
  	};
  
@@ -80,7 +78,7 @@ index dbc6fbbfd9fb..672a6bf40fe2 100644
  	speaker_amp: speaker-amplifier {
  		compatible = "simple-audio-amplifier";
  		pinctrl-names = "default";
-@@ -272,6 +282,20 @@ vcc_sys: vcc-sys {
+@@ -227,6 +237,20 @@ vcc_sys: vcc-sys-regulator {
  		vin-supply = <&vcc_bat>;
  	};
  
@@ -98,13 +96,17 @@ index dbc6fbbfd9fb..672a6bf40fe2 100644
 +		};
 +	};
 +
- 	vdd1v2_dvp: vdd1v2-dvp {
+ 	vdd1v2_dvp: vdd1v2-dvp-regulator {
  		compatible = "regulator-fixed";
  		regulator-name = "vdd1v2_dvp";
-@@ -860,6 +884,14 @@ wifi_pwren: wifi-pwren {
- 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+@@ -777,6 +801,18 @@ host_wake_wl: host-wake-wl {
+ 			rockchip,pins = <0 RK_PB7 RK_FUNC_GPIO &pcfg_pull_none>;
  		};
  
++		wifi_pwren: wifi-pwren {
++			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
 +		wifi_reg_on_h: wifi-reg-on-h {
 +			rockchip,pins = <0 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
 +		};
@@ -116,11 +118,36 @@ index dbc6fbbfd9fb..672a6bf40fe2 100644
  		wifi_wake_host_h: wifi-wake-host-h {
  			rockchip,pins = <0 RK_PC4 RK_FUNC_GPIO &pcfg_pull_down>;
  		};
-@@ -933,6 +965,7 @@ &sdmmc1 {
+@@ -850,8 +886,32 @@ &sdmmc1 {
  		     &sdmmc1_cmd
  		     &sdmmc1_clk>;
  	sd-uhs-sdr104;
 +	vmmc-supply = <&vcc_wl>;
  	vqmmc-supply = <&vcca1v8_pmu>;
  	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	bes2600: bes2600@0 {
++		compatible = "bestechnic,bes2600-sdio";
++		reg = <0>;
++
++		/*
++		 * The reset pin does not appear to be used in the latest driver drop by
++		 * Bestechnic. However, it is on the schematic but unfortunately wasn't
++		 * being used by Pine64.
++		 *
++		 * It doesn't hurt to configure it though, in case if they make use of
++		 * it in the near future.
++		 */
++		/* The reset pin is claimed by sdio_mmcseq, It's better to move it to U-Boot
++		 * so the OS can use it.
++		 */
++		//reset-gpios = <&gpio3 RK_PD2 GPIO_ACTIVE_LOW>;
++		wakeup-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_LOW>;
++		host-wakeup-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>;
++		local-mac-address = [de ad be ef 12 34];
++	};
  };
+ 
+ &sfc {

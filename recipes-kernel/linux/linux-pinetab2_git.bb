@@ -8,7 +8,7 @@ require recipes-kernel/linux/linux-yocto.inc
 
 COMPATIBLE_MACHINE = "pinetab2"
 
-LINUX_VERSION ?= "6.6.9"
+LINUX_VERSION ?= "6.9.0"
 LINUX_VERSION_EXTENSION = "-pinetab2"
 
 PV = "${LINUX_VERSION}-git"
@@ -17,20 +17,16 @@ KERNEL_VERSION_SANITY_SKIP="1"
 
 LINUX_KMETA_BRANCH = "yocto-dev"
 
-SRCREV_machine = "5e9df83a705290c4d974693097df1da9cbe25854"
-SRCREV_meta = "11390e802ca72f3549b9356f036b17e54afd7a34"
+SRCREV_machine = "586b5dfb51b962c1b6c06495715e4c4f76a7fc5a"
+SRCREV_meta = "6ae0f49095f26f3133d00772d8d9ca775fdacf9c"
 KMETA = "kernel-meta"
 SRC_URI = " \
-    git://gitlab.com/linux-kernel/stable.git;branch=linux-6.6.y;protocol=https;name=machine \
-    git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=yocto-6.6;destsuffix=${KMETA};name=meta \
+    git://github.com/torvalds/linux.git;branch=master;protocol=https;name=machine \
+    git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
     file://defconfig \
-    file://0001-arm64-dts-rockchip-Add-Pine64-PineTab2-device-trees.patch \
+    file://0001-rk3566-pinetab2.dtsi-Add-required-bits-for-WiFi.patch \
     file://0002-power-supply-rk817-Fix-battery-capacity-sanity-check.patch \
-    file://0003-drm-panel-Add-BOE-TH101MB31IG002-28A-MIPI-DSI-LCD-pa.patch \
-    file://0004-drm-panel-boe-th101mb31ig002-28a-Various-improvement.patch \
-    file://0006-arm64-dts-rockchip-pinetab2-Apply-BES-changes.patch \
-    file://0009-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
-    file://0012-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://0006-Patch-linux-framebuffer-logo-for-LuneOS.patch \
 "
 
 KBUILD_DEFCONFIG = ""
