@@ -28,9 +28,9 @@ SRC_URI = " \
     file://0002-power-supply-rk817-Fix-battery-capacity-sanity-check.patch \
     file://0003-drm-panel-Add-BOE-TH101MB31IG002-28A-MIPI-DSI-LCD-pa.patch \
     file://0004-drm-panel-boe-th101mb31ig002-28a-Various-improvement.patch \
-    file://0006-arm64-dts-rockchip-pinetab2-Apply-BES-changes.patch \
-    file://0009-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
-    file://0012-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://0005-arm64-dts-rockchip-pinetab2-Apply-BES-changes.patch \
+    file://0006-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
+    file://0007-Patch-linux-framebuffer-logo-for-LuneOS.patch \
 "
 
 KBUILD_DEFCONFIG = ""
