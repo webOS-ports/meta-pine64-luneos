@@ -10,13 +10,13 @@ SRC_URI:append:pinetab2 = " \
 
 do_install:append:pinetab2() {
     install -d ${D}${systemd_unitdir}/system
-    install -m 0644 ${WORKDIR}/wifi-macaddr-persister.service ${D}${systemd_unitdir}/system
-    install -m 0644 ${WORKDIR}/wifi-module-load.service ${D}${systemd_unitdir}/system
-    install -m 0644 ${WORKDIR}/hciattach.service ${D}${systemd_unitdir}/system
+    install -m 0644 ${UNPACKDIR}/wifi-macaddr-persister.service ${D}${systemd_unitdir}/system
+    install -m 0644 ${UNPACKDIR}/wifi-module-load.service ${D}${systemd_unitdir}/system
+    install -m 0644 ${UNPACKDIR}/hciattach.service ${D}${systemd_unitdir}/system
     
     install -d ${D}${systemd_unitdir}/system/scripts
-    install -m 0755 ${WORKDIR}/persist-wifi-mac-addr.sh ${D}${systemd_unitdir}/system/scripts
-    install -m 0755 ${WORKDIR}/hciattach.sh ${D}${systemd_unitdir}/system/scripts
+    install -m 0755 ${UNPACKDIR}/persist-wifi-mac-addr.sh ${D}${systemd_unitdir}/system/scripts
+    install -m 0755 ${UNPACKDIR}/hciattach.sh ${D}${systemd_unitdir}/system/scripts
 }
 
 SYSTEMD_SERVICE:${PN}:pinetab2 = " \
