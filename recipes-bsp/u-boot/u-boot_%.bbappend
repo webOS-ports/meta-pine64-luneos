@@ -29,6 +29,8 @@ DEPENDS:append:pinephonepro = " trusted-firmware-a u-boot-tools-native python3-s
 DEPENDS:append:pinetab2 = " u-boot-tools-native python3-setuptools-native python3-pyelftools-native"
 DEPENDS:append:pinephone = " crust-firmware"
 
+TFA_DEPENDS:pinetab2 = ""
+
 EXTRA_DEP:pinephone = "trusted-firmware-a:do_deploy crust-firmware:do_deploy"
 EXTRA_DEP:pinephonepro = "trusted-firmware-a:do_deploy"
 EXTRA_DEP = ""
