@@ -2,8 +2,8 @@ FILESEXTRAPATHS:prepend:pinephone := "${THISDIR}/files:"
 FILESEXTRAPATHS:prepend:pinephonepro := "${THISDIR}/files:"
 FILESEXTRAPATHS:prepend:pinetab2 := "${THISDIR}/files:"
 
-PV:pinephonepro ="2023.07"
-PV:pinetab2 ="2024.01"
+PV:pinephonepro = "2023.07"
+PV:pinetab2 = "2024.01"
 
 SRCREV:pinephonepro = "222aa75acee7f4140a2ca5c502e536419d4ff735"
 SRC_URI:pinephonepro = " \
