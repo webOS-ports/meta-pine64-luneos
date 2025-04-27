@@ -4,4 +4,4 @@
 # enable both lima and panfrost to be able to reuse mesa sstate between pp and ppp
 # meta-rockchip is enabling panfrost for rk3399:
 # mesa_%.bbappend:PACKAGECONFIG:append:rk3399 = " kmsro panfrost"
-PACKAGECONFIG:append = " kmsro panfrost lima"
+PACKAGECONFIG:append = " panfrost lima"
