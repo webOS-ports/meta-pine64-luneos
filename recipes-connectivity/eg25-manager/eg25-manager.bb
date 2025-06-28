@@ -18,7 +18,6 @@ SRC_URI = " \
     file://0003-Fix-not-existing-mm_modem-when-not-using-modemmanage.patch \
     file://eg25-manager.service \
 "
-S = "${WORKDIR}/git"
 
 SYSTEMD_SERVICE:${PN} = "eg25-manager.service"
 
