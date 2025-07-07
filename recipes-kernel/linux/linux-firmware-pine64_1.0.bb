@@ -1,6 +1,6 @@
 DESCRIPTION = "Various firmware files for Pine64 PinePhone, PinePhonePro and PineTab2"
 LICENSE = "Proprietary"
-LIC_FILES_CHKSUM = "file://${WORKDIR}/LICENCE.rtlwifi_firmware.txt;md5=00d06cfd3eddd5a2698948ead2ad54a5"
+LIC_FILES_CHKSUM = "file://${UNPACKDIR}/LICENCE.rtlwifi_firmware.txt;md5=00d06cfd3eddd5a2698948ead2ad54a5"
 
 COMPATIBLE_MACHINE = "pinephonepro|pinephone|pinetab2"
 
@@ -54,27 +54,27 @@ do_compile() {
 
 do_install() {
     install -d ${D}${nonarch_base_libdir}/firmware/rtlwifi/
-    install -m 0644 ${WORKDIR}/rtl8723bs_nic.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_nic.bin
-    install -m 0644 ${WORKDIR}/rtl8723bs_bt.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_bt.bin
-    install -m 0644 ${WORKDIR}/rtl8723bs_wowlan.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_wowlan.bin
+    install -m 0644 ${UNPACKDIR}/rtl8723bs_nic.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_nic.bin
+    install -m 0644 ${UNPACKDIR}/rtl8723bs_bt.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_bt.bin
+    install -m 0644 ${UNPACKDIR}/rtl8723bs_wowlan.bin ${D}${nonarch_base_libdir}/firmware/rtlwifi/rtl8723bs_wowlan.bin
     install -d ${D}${nonarch_base_libdir}/firmware/rtl_bt/
-    install -m 0644 ${WORKDIR}/rtl8723cs_xx_fw.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_fw.bin
-    install -m 0644 ${WORKDIR}/rtl8723cs_xx_config.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_config.bin
-    install -m 0644 ${WORKDIR}/git/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
+    install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_fw.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_fw.bin
+    install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_config.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_config.bin
+    install -m 0644 ${UNPACKDIR}/git/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
 }
 
 do_install:append:pinephonepro() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
     install -d ${D}${nonarch_base_libdir}/firmware/brcm/
-    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${UNPACKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
-    install -m 0644 ${WORKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
+    install -m 0644 ${UNPACKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
     ln -s brcmfmac43456-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
 }
 
 do_install:append:pinetab2() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
-    install -m 0644 ${WORKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${UNPACKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
     install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
@@ -82,7 +82,7 @@ do_install:append:pinetab2() {
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio_btrf.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_btrf.bin
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio_nosignal.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_nosignal.bin
     install -d ${D}${nonarch_base_libdir}/firmware/mediatek/
-    install -m 0644 ${WORKDIR}/mt7610u.bin ${D}${nonarch_base_libdir}/firmware/mediatek/mt7610u.bin
+    install -m 0644 ${UNPACKDIR}/mt7610u.bin ${D}${nonarch_base_libdir}/firmware/mediatek/mt7610u.bin
 }
 
 FILES:${PN} = "${nonarch_base_libdir}/firmware"
