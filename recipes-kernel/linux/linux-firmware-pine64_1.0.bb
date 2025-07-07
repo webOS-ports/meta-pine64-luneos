@@ -26,11 +26,11 @@ SRC_URI = " \
     https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_config.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
-    git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
-    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
-    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
-    git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
-    git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
+    git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/pinerock \
+    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ap6256bt \
+    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/bes2600 \
+    git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/wifinonfree \
+    git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ov5640cam \
 "
 
 SRC_URI[rtl8723bs_ap_wowlan.sha256sum] = "957707c7d6e01564685a801da1084a60b6b726c3d756d54dbe56ce064110e288"
@@ -58,21 +58,21 @@ do_install() {
     install -d ${D}${nonarch_base_libdir}/firmware/rtl_bt/
     install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_fw.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_fw.bin
     install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_config.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_config.bin
-    install -m 0644 ${UNPACKDIR}/git/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
+    install -m 0644 ${S}/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
 }
 
 do_install:append:pinephonepro() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
     install -d ${D}${nonarch_base_libdir}/firmware/brcm/
-    install -m 0644 ${UNPACKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${S}/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
-    install -m 0644 ${UNPACKDIR}/git/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
+    install -m 0644 ${S}/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
     ln -s brcmfmac43456-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
 }
 
 do_install:append:pinetab2() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
-    install -m 0644 ${UNPACKDIR}/git/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${S}/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
     install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
