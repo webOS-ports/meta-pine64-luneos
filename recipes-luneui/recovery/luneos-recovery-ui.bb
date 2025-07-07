@@ -6,10 +6,8 @@ LIC_FILES_CHKSUM = "file://../LICENSE;md5=1ebbd3e34237af26da5dc08a4e440464"
 
 DEPENDS = "lvgl"
 
-SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=lvgl-9.0;protocol=https \
-    file://0001-Fix-build-with-lvgl-9.2.patch;patchdir=.. \
-"
-SRCREV = "759b5ef3b0a7bd5b4463714ccef8bf05f93e68c3"
+SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=master;protocol=https"
+SRCREV = "b7d2d1d4cb78d7292f06b167ad0234488bf49dac"
 
 S = "${WORKDIR}/git/recovery"
 
