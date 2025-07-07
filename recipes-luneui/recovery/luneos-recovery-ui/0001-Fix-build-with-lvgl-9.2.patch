@@ -1,0 +1,39 @@
+From 821d55c0a2a5ec081473e414e8ab94d28835e6db Mon Sep 17 00:00:00 2001
+From: Martin Jansa <martin.jansa@gmail.com>
+Date: Mon, 7 Jul 2025 12:31:25 +0000
+Subject: [PATCH] Fix build with lvgl-9.2
+
+Fixes:
+FAILED: [code=1] CMakeFiles/luneos_recovery_ui.dir/ui/actions.c.o
+/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot-native/usr/bin/aarch64-webos-linux/aarch64-webos-linux-gcc --sysroot=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot  -I/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/sources/luneos-recovery-ui-1.0/recovery/. -mbranch-protection=standard  --sysroot=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot  -O2 -g  -ffile-prefix-map=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/sources/luneos-recovery-ui-1.0/recovery=/usr/src/debug/luneos-recovery-ui/1.0  -ffile-prefix-map=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/build=/usr/src/debug/luneos-recovery-ui/1.0  -ffile-prefix-map=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot=  -ffile-prefix-map=/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot-native=  -pipe -DLV_CONF_INCLUDE_SIMPLE=1 -I/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/recipe-sysroot//usr/include/lvgl -MD -MT CMakeFiles/luneos_recovery_ui.dir/ui/actions.c.o -MF CMakeFiles/luneos_recovery_ui.dir/ui/actions.c.o.d -o CMakeFiles/luneos_recovery_ui.dir/ui/actions.c.o -c /OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/sources/luneos-recovery-ui-1.0/recovery/ui/actions.c
+/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/sources/luneos-recovery-ui-1.0/recovery/ui/actions.c: In function 'event_handler_refresh_dmesg':
+/OE/build/luneos-whinlatter/tmp/work/pinephone-webos-linux/luneos-recovery-ui/1.0/sources/luneos-recovery-ui-1.0/recovery/ui/actions.c:58:32: error: invalid use of incomplete typedef 'lv_timer_t'
+   58 |     lv_obj_t *dmesgTextArea = t->user_data;
+      |                                ^~
+
+lv_timer is private since:
+https://github.com/lvgl/lvgl/commit/1d14386b99cdff731cc3367d1d8b5e96ffb8fcea
+
+we can use lv_timer_get_user_data available since 9.0.0:
+https://github.com/lvgl/lvgl/commit/a26da025a4147775e246375082adea8c08d586b7
+
+Signed-off-by: Martin Jansa <martin.jansa@gmail.com>
+---
+Upstream-Status: Submitted [https://github.com/Tofee/luneos-recovery-ui/pull/4]
+
+ recovery/ui/actions.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/recovery/ui/actions.c b/recovery/ui/actions.c
+index 631f4e5..a8eb759 100644
+--- a/recovery/ui/actions.c
++++ b/recovery/ui/actions.c
+@@ -54,7 +54,7 @@ void event_handler_Poweroff(lv_event_t *e)
+ 
+ void event_handler_refresh_dmesg(lv_timer_t * t)
+ {
+-    lv_obj_t *dmesgTextArea = t->user_data;
++    lv_obj_t *dmesgTextArea = lv_timer_get_user_data(t);
+     if (!dmesgTextArea) return;
+ 
+     /* Dmesg log */
