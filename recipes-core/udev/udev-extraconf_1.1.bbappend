@@ -17,12 +17,12 @@ SRC_URI:append:pinephonepro = " \
 
 do_install:append:pinephone() {
     # setup wifi power saving mode when charger is (dis)connected
-    install -m 0644 ${WORKDIR}/pinephone/70-wifi-pm.rules ${D}${sysconfdir}/udev/rules.d/70-wifi-pm.rules
+    install -m 0644 ${UNPACKDIR}/pinephone/70-wifi-pm.rules ${D}${sysconfdir}/udev/rules.d/70-wifi-pm.rules
     # configure EG25 modem nodes
-    install -m 0644 ${WORKDIR}/pinephone/90-modem-eg25.rules ${D}${sysconfdir}/udev/rules.d/90-modem-eg25.rules
+    install -m 0644 ${UNPACKDIR}/pinephone/90-modem-eg25.rules ${D}${sysconfdir}/udev/rules.d/90-modem-eg25.rules
 }
 
 do_install:append:pinephonepro() {
     # configure EG25 modem nodes
-    install -m 0644 ${WORKDIR}/pinephonepro/90-modem-eg25.rules ${D}${sysconfdir}/udev/rules.d/90-modem-eg25.rules
+    install -m 0644 ${UNPACKDIR}/pinephonepro/90-modem-eg25.rules ${D}${sysconfdir}/udev/rules.d/90-modem-eg25.rules
 }
