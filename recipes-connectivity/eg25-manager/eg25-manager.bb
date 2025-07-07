@@ -24,7 +24,7 @@ SYSTEMD_SERVICE:${PN} = "eg25-manager.service"
 
 do_install:append() {
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${WORKDIR}/eg25-manager.service ${D}${systemd_system_unitdir}/eg25-manager.service
+    install -m 0644 ${UNPACKDIR}/eg25-manager.service ${D}${systemd_system_unitdir}/eg25-manager.service
 }
 
 FILES:${PN} = "/usr/udev \
