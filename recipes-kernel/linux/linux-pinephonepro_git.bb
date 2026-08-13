@@ -31,6 +31,16 @@ SRC_URI = " \
 
 KBUILD_DEFCONFIG = ""
 
+# rk3399.inc (pulled in via rock-pi-4.inc) appends a Rockchip kmeta feature to KERNEL_FEATURES for
+# every rk3399 machine:
+#     KERNEL_FEATURES:append:rk3399 = " bsp/rockchip/remove-non-rockchip-arch-arm64.scc"
+# That .scc lives in meta-rockchip's rockchip-kmeta, which only its linux-yocto bbappend puts on
+# SRC_URI, so for this recipe it is a dangling feature and do_kernel_metadata fails with
+#     ERROR: Feature 'bsp/rockchip/remove-non-rockchip-arch-arm64.scc' not found
+# It is not wanted here either: this builds megi's tree against the complete defconfig shipped
+# above, not a kernel-cache assembled config.
+KERNEL_FEATURES:remove = "bsp/rockchip/remove-non-rockchip-arch-arm64.scc"
+
 # yaml and dtschema are required for 5.16+ device tree validation, libyaml is checked
 # via pkgconfig, so must always be present, but we can wrap the others to make them
 # conditional

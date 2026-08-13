@@ -8,14 +8,13 @@ RDEPENDS:${PN} = "atinout"
 
 inherit meson systemd pkgconfig
 
-PV = "0.4.2-1+git"
+PV = "0.5.2+git"
 
-SRCREV = "88c68b9933f47f863e6685b2b6502d5d7ed1871c"
+SRCREV = "99aa7e2bf7c3b93a84929ebc1ddc46ae881fde65"
 SRC_URI = " \
     git://gitlab.com/mobian1/devices/eg25-manager.git;protocol=https;branch=master \
     file://0001-Fix-udev-dir-for-LuneOS.patch \
     file://0002-Add-VoLTE-configuration.patch \
-    file://0003-Fix-not-existing-mm_modem-when-not-using-modemmanage.patch \
     file://eg25-manager.service \
 "
 
@@ -31,7 +30,6 @@ FILES:${PN} = "/usr/udev \
                /usr/udev/rules.d/80-modem-eg25.rules \
                ${libdir} \
                ${datadir}/eg25-manager \
-               ${bindir}/eg25manager \
-               ${bindir}/eg25-configure-usb \
+               ${bindir}/eg25-manager \
                ${systemd_system_unitdir}/eg25-manager.service \
 "

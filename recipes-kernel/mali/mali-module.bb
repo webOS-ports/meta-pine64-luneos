@@ -17,7 +17,7 @@ EXTRA_OEMAKE += "KDIR=${STAGING_KERNEL_BUILDDIR} USING_UMP=0 BUILD=release USING
 MODULES_INSTALL_TARGET = "install"
 
 do_configure:prepend() {
-    cd ${WORKDIR}/git/r6p2
+    cd ${UNPACKDIR}/${BB_GIT_DEFAULT_DESTSUFFIX}/r6p2
     quilt pop -a || true
     quilt push -a
 }

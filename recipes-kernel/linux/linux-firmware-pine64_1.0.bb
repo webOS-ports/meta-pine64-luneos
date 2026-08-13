@@ -12,7 +12,12 @@ SRCREV_ap6256bt = "a30bf312b268eab42d38fab0cc3ed3177895ff5d"
 SRCREV_wifinonfree = "f713a6054746bc61ece1c8696dce91a7b7e22dd9"
 SRCREV_bes2600 = "7a305de61771a84f1264866b204cf172df6d9195"
 SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
-SRCREV_megous = "6e8e591e17e207644dfe747e51026967bb1edab5"
+# megous.com went unreachable (wget exits 4 on every attempt), which took the whole recipe
+# down with it. maemo-leste republishes the identical blobs on GitHub -- both files are
+# byte-for-byte the same as the megous ones, verified against the sha256sums below -- so
+# this is a host swap, not a firmware change. Pinned to a commit rather than a branch so
+# the URL keeps meaning the same bytes.
+SRCREV_rtl8723bt = "d90fa8a98cec71011c87c847f23a38ee75f85f20"
 
 SRCREV_FORMAT = "pinerock_ap6256bt_wifinonfree_bes2600_ov5640cam"
 
@@ -22,8 +27,8 @@ SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_nic.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_nic.bin;name=rtl8723bs_nic \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_bt.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_bt.bin;name=rtl8723bs_bt \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mediatek/mt7610u.bin?id=${SRCREV_kernel};downloadfilename=mt7610u.bin;name=mt7610u \
-    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_fw.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
-    https://megous.com/git/linux-firmware/plain/rtl_bt/rtl8723cs_xx_config.bin?id=${SRCREV_megous};downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
+    https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_fw.bin;downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
+    https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_config.bin;downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
     git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/pinerock \
