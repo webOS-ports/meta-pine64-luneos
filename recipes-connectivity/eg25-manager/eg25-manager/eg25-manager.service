@@ -6,7 +6,7 @@ Before=ofono.service
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/eg25manager
+ExecStart=/usr/bin/eg25-manager
 
 [Install]
 WantedBy=multi-user.target
