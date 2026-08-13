@@ -6,8 +6,12 @@ PV:pinephonepro = "2023.07"
 PV:pinetab2 = "2024.01"
 
 SRCREV:pinephonepro = "222aa75acee7f4140a2ca5c502e536419d4ff735"
+# megi moved his repos to Codeberg: xff.cz/git/u-boot now 302s to codeberg.org/megi/u-boot, which
+# git refuses to follow ("unable to update url base from redirection"), and megous.com -- the host
+# the old clone URL actually pointed at -- no longer resolves at all. Same SRCREV, which is still
+# reachable on the ppp-2023.07 branch there.
 SRC_URI:pinephonepro = " \
-    git://xff.cz/git/u-boot;protocol=https;branch=ppp-2023.07 \
+    git://codeberg.org/megi/u-boot;protocol=https;branch=ppp-2023.07 \
 "
 
 SRCREV:pinetab2 = "583d37d192d92c5e92efa68b1d97f8ecdef71c47"
