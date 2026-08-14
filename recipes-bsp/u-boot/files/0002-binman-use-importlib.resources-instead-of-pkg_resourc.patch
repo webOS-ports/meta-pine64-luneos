@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: [PATCH] binman: use importlib.resources instead of pkg_resources
+
+binman dies as soon as the SPL is linked:
+
+    tools/binman/binman ... build -u -d u-boot.dtb ...
+    File ".../tools/binman/control.py", line 16, in <module>
+        import pkg_resources
+    ModuleNotFoundError: No module named 'pkg_resources'
+
+pkg_resources was a setuptools module, deprecated for years and dropped in
+setuptools 81; wrynose stages setuptools 82.0.1, so it is simply gone. The
+recipe already depends on python3-setuptools-native - there is no longer
+anything there to depend on.
+
+control.py already imports importlib.resources and uses it at line 738, so use
+it for the two remaining pkg_resources calls as well:
+
+  - resource_string() returns bytes and the caller decodes utf-8 itself, so
+    read_bytes() is the match, not read_text().
+  - resource_listdir() returns bare filenames, which is what the .py filter
+    just below expects, so take .name off each entry.
+
+Both were passed __name__ ('binman.control'); pkg_resources resolves that to
+the containing package, so address 'binman' directly, as line 738 already does.
+
+Upstream-Status: Inappropriate [u-boot 2024.01 is pinned here for RK3566;
+fixed upstream in later releases]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ tools/binman/control.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+--- a/tools/binman/control.py
++++ b/tools/binman/control.py
+@@ -13,7 +13,6 @@
+     # for Python 3.6
+     import importlib_resources
+ import os
+-import pkg_resources
+ import re
+ 
+ import sys
+@@ -96,7 +95,8 @@
+             msg = ''
+         return tag, msg
+ 
+-    my_data = pkg_resources.resource_string(__name__, 'missing-blob-help')
++    my_data = (importlib.resources.files('binman')
++               .joinpath('missing-blob-help').read_bytes())
+     re_tag = re.compile('^([-a-z0-9]+):$')
+     result = {}
+     tag = None
+@@ -151,7 +151,8 @@
+     Returns:
+         Set of paths to entry class filenames
+     """
+-    glob_list = pkg_resources.resource_listdir(__name__, 'etype')
++    glob_list = [item.name for item in
++                 importlib.resources.files('binman').joinpath('etype').iterdir()]
+     glob_list = [fname for fname in glob_list if fname.endswith('.py')]
+     return set([os.path.splitext(os.path.basename(item))[0]
+                 for item in glob_list
