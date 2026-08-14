@@ -1,0 +1,77 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: [PATCH] pylibfdt: build with SWIG 4.3 and newer
+
+do_compile fails against swig 4.4.1:
+
+    scripts/dtc/pylibfdt/libfdt_wrap.c:7004:19: error: too few arguments to
+    function 'SWIG_Python_AppendOutput'; expected 3, have 2
+
+SWIG 4.3.0 gave SWIG_Python_AppendOutput() a third "is_void" parameter. Code
+that SWIG generates itself was updated to match, but libfdt.i carries
+hand-written typemaps that call the function directly, and those still pass
+two arguments.
+
+Wrap the call so the interface file works with either signature. All three
+sites append to a result that is already a value (a property's name, a node
+depth, a reserve-map entry), never to a void return, so is_void is 0.
+
+The wrapper is defined after "#include <libfdt.h>" in the %{ %} header block,
+which SWIG emits well after its own "#define SWIG_VERSION", so the version test
+resolves.
+
+Upstream-Status: Inappropriate [u-boot 2024.01 is pinned here for RK3566;
+fixed upstream in later releases via dtc]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ scripts/dtc/pylibfdt/libfdt.i_shipped | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+--- a/scripts/dtc/pylibfdt/libfdt.i_shipped
++++ b/scripts/dtc/pylibfdt/libfdt.i_shipped
+@@ -18,6 +18,17 @@
+ #include "libfdt.h"
+ 
+ /*
++ * SWIG 4.3.0 gave SWIG_Python_AppendOutput() a third "is_void" argument. The
++ * typemaps below are hand-written and so have to pick the right signature
++ * themselves; every one of them appends to a non-void result, so pass 0.
++ */
++#if SWIG_VERSION >= 0x040300
++#define fdt_append_output(result, obj) SWIG_Python_AppendOutput(result, obj, 0)
++#else
++#define fdt_append_output(result, obj) SWIG_Python_AppendOutput(result, obj)
++#endif
++
++/*
+  * We rename this function here to avoid problems with swig, since we also have
+  * a struct called fdt_property. That struct causes swig to create a class in
+  * libfdt.py called fdt_property(), which confuses things.
+@@ -1037,7 +1048,7 @@
+ 			fdt_string(fdt1, fdt32_to_cpu($1->nameoff)));
+ 		buff = PyByteArray_FromStringAndSize(
+ 			(const char *)($1 + 1), fdt32_to_cpu($1->len));
+-		resultobj = SWIG_Python_AppendOutput(resultobj, buff);
++		resultobj = fdt_append_output(resultobj, buff);
+ 	}
+ }
+ 
+@@ -1076,7 +1087,7 @@
+ 
+ %typemap(argout) int *depth {
+         PyObject *val = Py_BuildValue("i", *arg$argnum);
+-        resultobj = SWIG_Python_AppendOutput(resultobj, val);
++        resultobj = fdt_append_output(resultobj, val);
+ }
+ 
+ %apply int *depth { int *depth };
+@@ -1092,7 +1103,7 @@
+            if (PyTuple_GET_SIZE(resultobj) == 0)
+               resultobj = val;
+            else
+-              resultobj = SWIG_Python_AppendOutput(resultobj, val);
++              resultobj = fdt_append_output(resultobj, val);
+         }
+ }
+ 
