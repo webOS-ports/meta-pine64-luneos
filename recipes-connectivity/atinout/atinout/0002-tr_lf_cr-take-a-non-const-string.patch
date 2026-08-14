@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: [PATCH] tr_lf_cr: take a non-const string
+
+atinout builds with -Werror and stops on:
+
+    atinout.c: In function 'tr_lf_cr':
+    atinout.c:84:11: error: assignment discards 'const' qualifier from pointer
+                            target type [-Werror=discarded-qualifiers]
+       84 |         p = strchr(s, '\n');
+
+C23 makes strchr() and friends qualifier-preserving (N3020), so with GCC 15
+defaulting to -std=gnu23 and a glibc that implements it, strchr() on a
+const char * now returns a const char * instead of a char *.
+
+The declaration was wrong to begin with: tr_lf_cr() writes through the pointer
+it is given ("*p = '\r'"), so taking it as const char * was casting the
+qualifier away regardless of what strchr() returned. Its only caller passes
+"line", which is already a plain char *, so make the parameter match what the
+function actually does.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ atinout.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/atinout.c
++++ b/atinout.c
+@@ -78,7 +78,7 @@
+ }
+ 
+ /* Replace '\n' with '\r', aka `tr '\012' '\015'` */
+-static bool tr_lf_cr(const char *s)
++static bool tr_lf_cr(char *s)
+ {
+ 	char *p;
+ 	p = strchr(s, '\n');
