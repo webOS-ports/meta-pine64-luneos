@@ -54,3 +54,17 @@ do_configure:prepend:pinephone() {
 }
 
 FILES:${PN}:append:pinephone = " /boot/boot.scr"
+
+# pinetab2 is pinned to Kwiboo's rk35xx-2024.01 fork for RK3566 support, and that
+# tree's bundled pylibfdt bindings predate the SWIG 4.3 change that gave
+# SWIG_Python_AppendOutput a third (is_void) argument, so do_compile fails with
+#
+#   libfdt_wrap.c: error: too few arguments to function 'SWIG_Python_AppendOutput';
+#   expected 3, have 2
+#
+# against wrynose's swig 4.4.1. u-boot's Makefile skips building both dtc and
+# pylibfdt when DTC is supplied ("If DTC is provided, it is assumed the pylibfdt
+# is available too"), and OE already stages both natively, so point it at those
+# instead of rebuilding them.
+DEPENDS:append:pinetab2 = " dtc-native python3-pylibfdt-native"
+EXTRA_OEMAKE:append:pinetab2 = " DTC=${STAGING_BINDIR_NATIVE}/dtc"
