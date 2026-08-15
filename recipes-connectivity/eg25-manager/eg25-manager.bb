@@ -10,7 +10,7 @@ inherit meson systemd pkgconfig
 
 PV = "0.5.2+git"
 
-SRCREV = "99aa7e2bf7c3b93a84929ebc1ddc46ae881fde65"
+SRCREV = "2d8a19bfd7a4575489f1cb5adab042ad49ffec88"
 SRC_URI = " \
     git://gitlab.com/mobian1/devices/eg25-manager.git;protocol=https;branch=master \
     file://0001-Fix-udev-dir-for-LuneOS.patch \
