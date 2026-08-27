@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Thu, 27 Aug 2026 00:00:00 +0000
+Subject: [PATCH] cmd: tmenu: include cli.h for cli_simple_run_command()
+
+tmenu.c calls cli_simple_run_command() but only includes cli_hush.h; the
+declaration lives in cli.h. GCC 15 promotes implicit function
+declarations to an error:
+
+    cmd/tmenu.c:637:25: error: implicit declaration of function
+    'cli_simple_run_command' [-Wimplicit-function-declaration]
+
+Upstream-Status: Inappropriate [tmenu is specific to megi's ppp-2023.07
+u-boot fork, which is pinned here for the PinePhone Pro]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ cmd/tmenu.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/cmd/tmenu.c
++++ b/cmd/tmenu.c
+@@ -6,6 +6,7 @@
+ #include <bootflow.h>
+ #include <bootstd.h>
+ #include <command.h>
++#include <cli.h>
+ #include <cli_hush.h>
+ #include <video.h>
+ #include <video_font.h>
