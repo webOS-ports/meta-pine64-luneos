@@ -5,6 +5,11 @@ FILESEXTRAPATHS:prepend:pinetab2 := "${THISDIR}/files:"
 PV:pinephonepro = "2023.07"
 PV:pinetab2 = "2024.01"
 
+# meta-rockchip points BL31 at meta-arm's trusted-firmware-a deploy layout
+# (trusted-firmware-a/bl31.elf), but pinephonepro builds this layer's TF-A 2.6
+# recipe instead, which deploys bl31-rk3399.elf at the top of DEPLOY_DIR_IMAGE.
+BL31:pinephonepro = "${DEPLOY_DIR_IMAGE}/bl31-rk3399.elf"
+
 SRCREV:pinephonepro = "222aa75acee7f4140a2ca5c502e536419d4ff735"
 # megi moved his repos to Codeberg: xff.cz/git/u-boot now 302s to codeberg.org/megi/u-boot, which
 # git refuses to follow ("unable to update url base from redirection"), and megous.com -- the host
@@ -55,13 +60,19 @@ do_configure:prepend:pinephone() {
 
 FILES:${PN}:append:pinephone = " /boot/boot.scr"
 
-# pinetab2 is pinned to Kwiboo's rk35xx-2024.01 fork for RK3566 support, whose
-# bundled pylibfdt bindings predate the SWIG 4.3 change that gave
-# SWIG_Python_AppendOutput a third (is_void) argument, so do_compile fails
-# against wrynose's swig 4.4.1. The board needs its own pylibfdt: CONFIG_BINMAN
-# and CONFIG_PYLIBFDT are both set, and wrynose's dtc-native is built with
-# -Dpython=disabled, so nothing in the tree stages one to borrow.
+# pinetab2 (Kwiboo's rk35xx-2024.01 fork) and pinephonepro (megi's ppp-2023.07
+# branch) are pinned to forks whose bundled pylibfdt bindings predate the SWIG
+# 4.3 change that gave SWIG_Python_AppendOutput a third (is_void) argument, so
+# do_compile fails against wrynose's swig 4.4.1. The boards need their own
+# pylibfdt: CONFIG_BINMAN and CONFIG_PYLIBFDT are both set, and wrynose's
+# dtc-native is built with -Dpython=disabled, so nothing in the tree stages one
+# to borrow.
 SRC_URI:append:pinetab2 = " \
     file://0001-pylibfdt-build-with-SWIG-4.3-and-newer.patch \
     file://0002-binman-use-importlib.resources-instead-of-pkg_resourc.patch \
+"
+SRC_URI:append:pinephonepro = " \
+    file://0001-pylibfdt-build-with-SWIG-4.3-and-newer.patch \
+    file://0002-binman-use-importlib.resources-instead-of-pkg_resourc.patch \
+    file://0002-cmd-tmenu-include-cli.h-for-cli_simple_run_command.patch \
 "
