@@ -18,8 +18,6 @@ SRC_URI:append = " \
     file://0005-feat-build-add-support-for-new-binutils-versions.patch \
 "
 
-S = "${WORKDIR}/git"
-
 COMPATIBLE_MACHINE = "pine64|sopine-a64|pinephone|pinephonepro"
 
 PLATFORM:pine64 = "sun50i_a64"

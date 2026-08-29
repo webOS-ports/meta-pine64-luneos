@@ -31,11 +31,11 @@ SRC_URI = " \
     https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_config.bin;downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
-    git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=git/pinerock \
-    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=git/ap6256bt \
-    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=git/bes2600 \
-    git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=git/wifinonfree \
-    git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=git/ov5640cam \
+    git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/pinerock \
+    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ap6256bt \
+    git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/bes2600 \
+    git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/wifinonfree \
+    git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ov5640cam \
 "
 
 SRC_URI[rtl8723bs_ap_wowlan.sha256sum] = "957707c7d6e01564685a801da1084a60b6b726c3d756d54dbe56ce064110e288"
@@ -48,8 +48,6 @@ SRC_URI[ov5640_af.sha256sum] = "439245623bc99f3b0d8c44d47baed3cc17cad01b9191509c
 SRC_URI[mt7610u.sha256sum] = "5a4268e9021bb587426ba624b425f1e660bfc82cd63b36ad3ce6fb9ce6751760"
 SRC_URI[LICENSE_rtlwifi.sha256sum] = "a61351665b4f264f6c631364f85b907d8f8f41f8b369533ef4021765f9f3b62e"
 SRC_URI[LICENSE_mediatek.sha256sum] = "a90d3f66704d85889945fec5525ea77622549da83aced1aac99828383f8f1805"
-
-S = "${WORKDIR}/git"
 
 do_configure() {
 }
