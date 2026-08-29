@@ -17,7 +17,6 @@ SRC_URI = " \
     file://0002-Add-VoLTE-configuration.patch \
     file://eg25-manager.service \
 "
-S = "${WORKDIR}/git"
 
 SYSTEMD_SERVICE:${PN} = "eg25-manager.service"
 

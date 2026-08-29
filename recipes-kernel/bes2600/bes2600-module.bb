@@ -13,7 +13,6 @@ SRCREV = "1b61b519a3b5697f7a9bfff15cb957e0aad03d65"
 SRC_URI = "git://github.com/cringeops/bes2600.git;branch=master;protocol=https \
            file://0001-Fix-build-with-Linux-6.6.9.patch \
 "
-S = "${WORKDIR}/git"
 
 MODULES_MODULE_SYMVERS_LOCATION = "bes2600"
 EXTRA_OEMAKE += "KERN_DIR=${STAGING_KERNEL_BUILDDIR} -C ${STAGING_KERNEL_BUILDDIR} M=${S}/bes2600"

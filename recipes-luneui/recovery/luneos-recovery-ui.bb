@@ -9,7 +9,7 @@ DEPENDS = "lvgl"
 SRC_URI = "git://github.com/Tofee/luneos-recovery-ui.git;branch=master;protocol=https"
 SRCREV = "b7d2d1d4cb78d7292f06b167ad0234488bf49dac"
 
-S = "${WORKDIR}/git/recovery"
+S = "${UNPACKDIR}/${BB_GIT_DEFAULT_DESTSUFFIX}/recovery"
 
 inherit cmake
 

@@ -13,8 +13,6 @@ SRC_URI = "git://github.com/crust-firmware/crust.git;protocol=https;branch=${BRA
            https://musl.cc/or1k-linux-musl-cross.tgz \
 "
 
-S = "${WORKDIR}/git"
-
 SRC_URI[sha256sum] = "49751856f47b3f6ee468ea867acb6bf482b1b4aff57257de482e8d1c9f38db94"
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
