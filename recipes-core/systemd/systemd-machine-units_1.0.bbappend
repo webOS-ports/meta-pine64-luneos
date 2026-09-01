@@ -1,5 +1,12 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
+# The pinetab2 append below adds nothing but local files, so nothing lands in
+# the default S = "${UNPACKDIR}/${BP}" and do_qa_unpack warns about it.
+# Scoped to pinetab2 rather than set outright: this layer is in BBLAYERS for
+# every build, so a bare S here would also apply to MACHINEs that get no
+# SRC_URI from this layer at all.
+S:pinetab2 = "${UNPACKDIR}"
+
 SRC_URI:append:pinetab2 = " \
     file://wifi-module-load.service \
     file://wifi-macaddr-persister.service \
