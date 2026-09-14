@@ -7,7 +7,6 @@ COMPATIBLE_MACHINE = "pinephonepro|pinephone|pinetab2"
 RDEPENDS:${PN} = "wireless-regdb"
 
 SRCREV_kernel = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
-SRCREV_pinerock = "937f0d52d27d7712da6a008d35fd7c2819e2b077"
 SRCREV_ap6256bt = "a30bf312b268eab42d38fab0cc3ed3177895ff5d"
 SRCREV_wifinonfree = "f713a6054746bc61ece1c8696dce91a7b7e22dd9"
 SRCREV_bes2600 = "7a305de61771a84f1264866b204cf172df6d9195"
@@ -19,20 +18,26 @@ SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 # the URL keeps meaning the same bytes.
 SRCREV_rtl8723bt = "d90fa8a98cec71011c87c847f23a38ee75f85f20"
 
-SRCREV_FORMAT = "pinerock_ap6256bt_wifinonfree_bes2600_ov5640cam"
+SRCREV_FORMAT = "wifinonfree_bes2600_ov5640cam"
 
+# gitlab.manjaro.org resolves IPv6-only and is currently unreachable from here
+# (do_fetch failed for every machine), so nothing that all machines need may live
+# there any more. rockchip/dptx.bin is now taken from linux-firmware upstream, which
+# carries the same firmware at the SRCREV_kernel already pinned above; it was not
+# byte-compared against the Manjaro copy, which is unreachable. The only remaining
+# Manjaro fetch is BCM4345C5.hcd - Broadcom BT firmware with no linux-firmware
+# equivalent - and it is scoped to the PinePhone Pro at the bottom of this recipe.
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_nic.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_nic.bin;name=rtl8723bs_nic \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_bt.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_bt.bin;name=rtl8723bs_bt \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mediatek/mt7610u.bin?id=${SRCREV_kernel};downloadfilename=mt7610u.bin;name=mt7610u \
+    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rockchip/dptx.bin?id=${SRCREV_kernel};downloadfilename=dptx.bin;name=dptx \
     https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_fw.bin;downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
     https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_config.bin;downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
-    git://gitlab.manjaro.org/tsys/pinebook-firmware.git;branch=master;protocol=https;name=pinerock;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/pinerock \
-    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ap6256bt \
     git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/bes2600 \
     git://github.com/RPi-Distro/firmware-nonfree.git;branch=buster;protocol=https;name=wifinonfree;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/wifinonfree \
     git://github.com/pmsourcedump/ov5640.git;branch=master;protocol=https;name=ov5640cam;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ov5640cam \
@@ -46,6 +51,7 @@ SRC_URI[rtl8723cs_xx_fw.sha256sum] = "c68091565d90c29735bedf72d0bf6590c186ab802e
 SRC_URI[rtl8723cs_xx_config.sha256sum] = "492531d5a0a44ed5d0e174476543735eafe2cacc5ff5ce9e8e10092d303b563c"
 SRC_URI[ov5640_af.sha256sum] = "439245623bc99f3b0d8c44d47baed3cc17cad01b9191509c89bb8d92a98949c9"
 SRC_URI[mt7610u.sha256sum] = "5a4268e9021bb587426ba624b425f1e660bfc82cd63b36ad3ce6fb9ce6751760"
+SRC_URI[dptx.sha256sum] = "203c5f061fb5075e4ca5398f8becc74e7cc450b494af857da5400788a7eae20b"
 SRC_URI[LICENSE_rtlwifi.sha256sum] = "a61351665b4f264f6c631364f85b907d8f8f41f8b369533ef4021765f9f3b62e"
 SRC_URI[LICENSE_mediatek.sha256sum] = "a90d3f66704d85889945fec5525ea77622549da83aced1aac99828383f8f1805"
 
@@ -69,7 +75,7 @@ do_install() {
 do_install:append:pinephonepro() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
     install -d ${D}${nonarch_base_libdir}/firmware/brcm/
-    install -m 0644 ${S}/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${UNPACKDIR}/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
     install -m 0644 ${S}/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
     ln -s brcmfmac43456-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
@@ -77,7 +83,7 @@ do_install:append:pinephonepro() {
 
 do_install:append:pinetab2() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
-    install -m 0644 ${S}/pinerock/rockchip/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
+    install -m 0644 ${UNPACKDIR}/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
     install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
@@ -89,3 +95,9 @@ do_install:append:pinetab2() {
 }
 
 FILES:${PN} = "${nonarch_base_libdir}/firmware"
+
+# PinePhone Pro only: BCM4345C5.hcd has no upstream linux-firmware equivalent.
+SRCREV_FORMAT:append:pinephonepro = "_ap6256bt"
+SRC_URI:append:pinephonepro = " \
+    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ap6256bt \
+"
