@@ -1,0 +1,72 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 7 Sep 2026 17:13:51 +0200
+Subject: [PATCH] arm64: dts: rk3566-pinetab2: wire WiFi to the LuneOS bes2600
+ driver
+
+This tree comments out the vendor bes2600 branch and merges the
+cw1200-based BES2600 bring-up instead. LuneOS ships the out-of-tree
+bes2600 driver (the bes2600-module recipe), which is further along, so
+point the node at that driver instead:
+
+- compatible becomes "bestechnic,bes2600-sdio", which is what the driver
+  looks for. It locates the node with a global of_find_compatible_node()
+  rather than through the SDIO device's of_node, and binds to the SDIO
+  function by device ID, so "reg" is not what matches it.
+- device-wakeup-gpios/regon-gpios are renamed to the wakeup-gpios and
+  powerup-gpios the driver actually reads, and host-wakeup-gpios is
+  uncommented. All four GPIO lookups are optional in the driver and fail
+  soft, so a name it does not recognise is silently dropped rather than
+  refused.
+
+wl_reg and wl_pwrseq (mmc-pwrseq-bes) are deliberately left as they are:
+that sequence drives pwrkey, pwren and reset, which is more than the
+mmc-pwrseq-simple node LuneOS used on 6.6 did.
+
+CONFIG_CW1200 must stay unset or its SDIO driver, which claims the same
+0x2002 device, can bind first.
+
+Upstream-Status: Inappropriate [depends on an out-of-tree driver]
+---
+ .../dts/rockchip/rk3566-pinetab2-v2.0.dts     | 20 +++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+index f54afebdb982..fdd8a1de644e 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+@@ -93,8 +93,20 @@ &sdmmc1 {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 
++	/*
++	 * LuneOS ships the out-of-tree bes2600 driver (bes2600-module) rather than
++	 * the cw1200-based bring-up this tree merges, so this node carries the
++	 * compatible and GPIO names that driver looks for. It finds this node with
++	 * a global of_find_compatible_node() on "bestechnic,bes2600-sdio" and reads
++	 * the reset/powerup/wakeup/host-wakeup GPIOs from it; the SDIO function
++	 * itself is matched by device ID, so "reg" is not what binds the driver.
++	 *
++	 * megi's wl_pwrseq (mmc-pwrseq-bes) is deliberately kept: it drives pwrkey,
++	 * pwren and reset, which is more than the mmc-pwrseq-simple node LuneOS used
++	 * on 6.6 managed.
++	 */
+ 	bes2600: wifi@1 {
+-		compatible = "bestechnic,bes2600";
++		compatible = "bestechnic,bes2600-sdio";
+ 		reg = <1>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&host_wake_wl &wifi_wake_host_h &wifi_regon>;
+@@ -102,9 +114,9 @@ bes2600: wifi@1 {
+ 		interrupt-parent = <&gpio0>;
+ 		interrupts = <RK_PC4 IRQ_TYPE_EDGE_RISING>;
+ 
+-		device-wakeup-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_HIGH>; // host_wake_wl
+-		//host-wakeup-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>; // wifi_wake_host_h
+-		regon-gpios = <&gpio0 RK_PC0 GPIO_ACTIVE_HIGH>;
++		wakeup-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_HIGH>; // host_wake_wl
++		host-wakeup-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>; // wifi_wake_host_h
++		powerup-gpios = <&gpio0 RK_PC0 GPIO_ACTIVE_HIGH>; // wifi_regon
+ 	};
+ };
+ 

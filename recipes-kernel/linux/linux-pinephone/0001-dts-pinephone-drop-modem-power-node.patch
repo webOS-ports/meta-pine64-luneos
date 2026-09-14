@@ -1,22 +1,28 @@
-From f846c719096012c9af482e8945cc01731ac7f31f Mon Sep 17 00:00:00 2001
-From: Clayton Craft <clayton@craftyguy.net>
-Date: Wed, 16 Dec 2020 20:16:14 -0800
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 7 Sep 2026 17:13:50 +0200
 Subject: [PATCH] dts: pinephone: drop modem-power node
 
----
-Upstream-Status: Pending
+LuneOS drives the EG25 through ofono and eg25-manager, not megi's
+modem-power driver, so the quectel,eg25 node only gets in the way: it
+claims the modem GPIOs and powers the modem on its own schedule.
 
- .../allwinner/sun50i-a64-pinephone-1.0.dts    | 26 +++---------------
- .../allwinner/sun50i-a64-pinephone-1.1.dts    | 27 +++----------------
- .../allwinner/sun50i-a64-pinephone-1.2.dts    | 27 +++----------------
- .../dts/allwinner/sun50i-a64-pinephone.dtsi   | 12 +++++++++
- 4 files changed, 24 insertions(+), 68 deletions(-)
+Remove the &uart3 override that carries it from each board revision. The
+UART itself stays enabled by sun50i-a64-pinephone.dtsi, so ofono still
+has its serial port.
+
+Upstream-Status: Inappropriate [LuneOS userspace policy]
+---
+ .../allwinner/sun50i-a64-pinephone-1.0.dts    | 22 ------------------
+ .../allwinner/sun50i-a64-pinephone-1.1.dts    | 23 -------------------
+ .../allwinner/sun50i-a64-pinephone-1.2.dts    | 23 -------------------
+ 3 files changed, 68 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.0.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.0.dts
-index a21c6d78a0ef..7f0cfdafed15 100644
+index 0530881d8401..ebe6c8324e34 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.0.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.0.dts
-@@ -86,28 +86,6 @@ &reg_drivevbus {
+@@ -87,28 +87,6 @@ &reg_drivevbus {
  	status = "okay";
  };
  
@@ -45,22 +51,11 @@ index a21c6d78a0ef..7f0cfdafed15 100644
  &usbphy {
  	usb-role-switch;
  
-@@ -118,6 +96,10 @@ usb0_drd_sw: endpoint {
- 	};
- };
- 
-+&ring_indicator {
-+	gpios = <&pio 1 2 GPIO_ACTIVE_LOW>; /* PB2 */
-+};
-+
- &sgm3140 {
- 	enable-gpios = <&pio 2 3 GPIO_ACTIVE_HIGH>; /* PC3 */
- 	flash-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.1.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.1.dts
-index d67f31ef529e..e7b636299d15 100644
+index 053e4add9973..73b338424580 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.1.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.1.dts
-@@ -114,29 +114,6 @@ &sgm3140 {
+@@ -101,29 +101,6 @@ &sgm3140 {
  	flash-gpios = <&pio 2 3 GPIO_ACTIVE_HIGH>; /* PC3 */
  };
  
@@ -90,19 +85,11 @@ index d67f31ef529e..e7b636299d15 100644
  &usbphy {
  	usb-role-switch;
  
-@@ -146,3 +123,7 @@ usb0_drd_sw: endpoint {
- 		};
- 	};
- };
-+
-+&ring_indicator {
-+	gpios = <&pio 1 2 GPIO_ACTIVE_LOW>; /* PB2 */
-+};
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.2.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.2.dts
-index 9b33186c7e7d..44b3d6555ff7 100644
+index fc017473a240..0220d50dc6ec 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.2.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone-1.2.dts
-@@ -107,29 +107,6 @@ &sgm3140 {
+@@ -93,29 +93,6 @@ &sgm3140 {
  	flash-gpios = <&pio 2 3 GPIO_ACTIVE_HIGH>; /* PC3 */
  };
  
@@ -132,44 +119,3 @@ index 9b33186c7e7d..44b3d6555ff7 100644
  &usbphy {
  	usb-role-switch;
  
-@@ -139,3 +116,7 @@ usb0_drd_sw: endpoint {
- 		};
- 	};
- };
-+
-+&ring_indicator {
-+	gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL6 */
-+};
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
-index 98f94c7577ee..67c58907ae1b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
-@@ -191,6 +191,17 @@ ec25_codec: ec25-codec {
- 		sound-name-prefix = "Modem";
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		ring_indicator: ring-indicator {
-+			label = "Ring Indicator";
-+			linux,can-disable;
-+			linux,code = <KEY_WAKEUP>;
-+			wakeup-source;
-+		};
-+	};
-+
- 	i2c_csi: i2c-csi {
- 		compatible = "i2c-gpio";
- 		sda-gpios = <&pio 4 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>; /* PE13 */
-@@ -255,6 +266,7 @@ reg_usb_5v: usb-5v {
- 	reg_vbat_bb: vbat-bb {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vbat-bb";
-+		regulator-always-on;
- 		regulator-min-microvolt = <3500000>;
- 		regulator-max-microvolt = <3500000>;
- 		gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
--- 
-2.30.1
-

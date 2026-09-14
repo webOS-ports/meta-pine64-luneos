@@ -10,8 +10,8 @@ declarations to an error:
     cmd/tmenu.c:637:25: error: implicit declaration of function
     'cli_simple_run_command' [-Wimplicit-function-declaration]
 
-Upstream-Status: Inappropriate [tmenu is specific to megi's ppp-2023.07
-u-boot fork, which is pinned here for the PinePhone Pro]
+Upstream-Status: Inappropriate [tmenu is specific to megi's u-boot fork,
+which is pinned here for the PinePhone Pro and PineTab2]
 Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
 ---
  cmd/tmenu.c | 1 +

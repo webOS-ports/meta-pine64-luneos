@@ -1,0 +1,166 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Subject: [PATCH] power: rk818_battery: fix boot SoC anchor and full-charge flicker
+
+The displayed battery percentage was wrong on alternating boots - "first
+power-on: dsoc=90" with a battery at 100%, then several minutes of
+visible climbing - and flickered 100->99->100 on the charger. Three
+bugs in the gauge's init and update paths:
+
+- rk818_is_first_power_on() trusted BAT_CON alone. That bit latches on
+  cold starts where the battery was never touched, so every boot that
+  saw it set anchored SoC to the boot-time OCV latch - depressed by
+  bootloader load, reading 10-25% low - and the relaxed-voltage
+  re-anchor then walked the display back up at 1% per poll. Because the
+  read also clears the bit, the symptom alternated between boots, which
+  is what made it look intermittent.
+
+  A gauge that has run before carries two marks a genuinely
+  first-powered one cannot: the warm-init flag and a learned FCC.
+  Require all three signs to agree before discarding saved state.
+
+- FG_INIT was read and cleared but never set anywhere, so the warm-boot
+  branch (trust the live coulomb counter and saved dsoc) was
+  unreachable dead code; and FCC was only saved on a first power-on, so
+  on a device that never took that branch the stored value stayed 0 and
+  every boot logged "stored FCC 0 mAh out of range, using design
+  capacity". Persist both at the end of init. They live in PMIC scratch
+  space: they survive reboot and shutdown and are lost exactly when the
+  battery is removed, which is when a fresh OCV anchor is wanted.
+
+- The relaxed-voltage re-anchor ran while the charger was online. A
+  battery at top-of-charge float is not chemically relaxed: with
+  charging terminated and current near zero the sampler qualifies, but
+  the OCV table maps the ~4.17 V float voltage to ~89%, so the
+  re-anchor fought the charge-finish snap (dsoc 100->99->100 every
+  ~16 min) and dropped the display from 100% to 86% when the stale
+  sample fired just after unplug. Gate it on the charger being offline
+  and discard the stale samples otherwise.
+
+Upstream-Status: Pending [worth submitting to megi]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/power/supply/rk818_battery.c
++++ b/drivers/power/supply/rk818_battery.c
+@@ -911,7 +911,25 @@
+  * Startup SoC initialisation
+  * ------------------------------------------------------------------------- */
+ 
+-static bool rk818_is_first_power_on(struct rk818_battery *di)
++static bool rk818_stored_fcc_valid(struct rk818_battery *di)
++{
++	u32 design_mah = di->info->charge_full_design_uah / 1000;
++	u32 fcc = 0;
++
++	fcc |= (u32)rk818_read(di, RK818_NEW_FCC_REG3) << 24;
++	fcc |= (u32)rk818_read(di, RK818_NEW_FCC_REG2) << 16;
++	fcc |= (u32)rk818_read(di, RK818_NEW_FCC_REG1) <<  8;
++	fcc |= (u32)rk818_read(di, RK818_NEW_FCC_REG0);
++
++	return fcc >= MIN_FCC && fcc <= design_mah;
++}
++
++/*
++ * BAT_CON is latched by the gauge and cleared here, so it must be read on
++ * every boot even when the caller has already decided this is not a first
++ * power-on - otherwise the bit survives into the next boot.
++ */
++static bool rk818_bat_con_latched(struct rk818_battery *di)
+ {
+ 	u8 val = rk818_read(di, RK818_GGSTS_REG);
+ 
+@@ -950,9 +968,30 @@
+ 	int saved_dsoc, saved_cap;
+ 	u8 cur, last;
+ 
+-	di->fcc_mah           = rk818_read_fcc(di);
+-	di->is_first_power_on = rk818_is_first_power_on(di);
++	di->fcc_mah = rk818_read_fcc(di);
++
++	/*
++	 * BAT_CON alone over-triggers: it latches on cold starts where the
++	 * battery was never touched, so trusting it made every other boot take
++	 * the raw-OCV anchor path below - and the boot-time OCV latch is
++	 * depressed by bootloader load, so the displayed SoC started low and
++	 * visibly climbed for minutes while the relaxed-voltage re-anchor
++	 * corrected it. Observed on a PinePhone Pro as an alternating pattern:
++	 * one boot "first power-on: dsoc=90" with the battery at 100%, the
++	 * next boot silently correct because the bit had been cleared by the
++	 * previous read.
++	 *
++	 * A gauge that has run before carries two marks that a genuinely
++	 * first-powered one cannot: the warm-init flag set at the end of this
++	 * function, and a learned FCC in scratch space. Require all three
++	 * signs to agree before throwing away the saved state. Read the warm
++	 * flag first - it is the strongest of the three, and on this hardware
++	 * the stored FCC reads 0 until the save below has run once.
++	 */
+ 	di->is_initialized    = rk818_was_warm_initialized(di);
++	di->is_first_power_on = rk818_bat_con_latched(di) &&
++				!di->is_initialized &&
++				!rk818_stored_fcc_valid(di);
+ 
+ 	cur  = rk818_read(di, RK818_NON_ACT_TIMER_CNT_REG);
+ 	last = rk818_read(di, RK818_NON_ACT_TIMER_CNT_SAVE_REG);
+@@ -1012,6 +1051,21 @@
+ 	rk818_set_coulomb_cap(di, di->remain_cap_mah);
+ 	di->rsoc = di->dsoc;
+ 
++	/*
++	 * Persist the two marks the decision above depends on. FG_INIT was
++	 * read and cleared but never set anywhere, which left the warm-boot
++	 * branch unreachable; the FCC was only saved on a first power-on, so
++	 * on a device that never took that branch it stayed 0 - "out of range,
++	 * using design capacity" on every boot. Both live in PMIC scratch
++	 * space: they survive reboot and shutdown, and are lost exactly when
++	 * the battery is removed, which is when a fresh OCV anchor is wanted.
++	 */
++	rk818_write(di, RK818_MISC_MARK_REG,
++		    rk818_read(di, RK818_MISC_MARK_REG) | FG_INIT);
++
++	if (!rk818_stored_fcc_valid(di))
++		rk818_save_fcc(di, (u32)di->fcc_mah);
++
+ 	dev_info(di->dev,
+ 		 "init done: dsoc=%d rsoc=%d cap=%d mAh fcc=%d mAh\n",
+ 		 di->dsoc, di->rsoc, di->remain_cap_mah, di->fcc_mah);
+@@ -1079,15 +1133,31 @@
+ 
+ 	di->voltage_relax_mv = rk818_get_relax_voltage(di);
+ 	if (di->voltage_relax_mv > 0) {
+-		int ocv_cap = vol_to_cap(di, di->voltage_relax_mv);
+-		int ocv_soc = vol_to_soc(di, di->voltage_relax_mv);
+-
+-		dev_dbg(di->dev,
+-			"relax OCV re-anchor: vol=%d mV soc=%d%% cap=%d mAh (was %d mAh)\n",
+-			di->voltage_relax_mv, ocv_soc, ocv_cap,
+-			di->remain_cap_mah);
+-		rk818_set_coulomb_cap(di, ocv_cap);
+-		rk818_restart_relax(di);
++		if (rk818_charger_online(di)) {
++			/*
++			 * A battery at top-of-charge float is not chemically
++			 * relaxed: with charging terminated and current near
++			 * zero the sampler qualifies, but the OCV table maps
++			 * the ~4.17 V float voltage to ~89%, and the re-anchor
++			 * then fights the charge-finish snap - dsoc flickered
++			 * 100->99->100 every relax period on a PinePhone Pro
++			 * left on the charger, and dropped 100 -> 86 when the
++			 * stale sample fired right after unplug. Discard the
++			 * samples instead; on battery the re-anchor runs as
++			 * before.
++			 */
++			rk818_restart_relax(di);
++		} else {
++			int ocv_cap = vol_to_cap(di, di->voltage_relax_mv);
++			int ocv_soc = vol_to_soc(di, di->voltage_relax_mv);
++
++			dev_dbg(di->dev,
++				"relax OCV re-anchor: vol=%d mV soc=%d%% cap=%d mAh (was %d mAh)\n",
++				di->voltage_relax_mv, ocv_soc, ocv_cap,
++				di->remain_cap_mah);
++			rk818_set_coulomb_cap(di, ocv_cap);
++			rk818_restart_relax(di);
++		}
+ 	}
+ 
+ 	di->remain_cap_mah = rk818_get_coulomb_cap(di);

@@ -1,48 +1,26 @@
-DESCRIPTION = "PinePhonePro Linux Kernel"
-SECTION = "kernel"
-LICENSE = "GPL-2.0-only"
-LIC_FILES_CHKSUM = "file://${S}/COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+DESCRIPTION = "PinePhonePro Linux Kernel (megi)"
 
-inherit kernel
-require recipes-kernel/linux/linux-yocto.inc
+require linux-megi.inc
 
 COMPATIBLE_MACHINE = "pinephonepro"
-
-LINUX_VERSION ?= "6.5.2"
 LINUX_VERSION_EXTENSION = "-pinephonepro"
 
-PV = "${LINUX_VERSION}-git"
-
-KERNEL_VERSION_SANITY_SKIP = "1"
-
-LINUX_KMETA_BRANCH = "yocto-dev"
-SRCREV_machine = "309ad54d4c29193d272ed0b3903718b9a241c8b3" 
-SRCREV_meta = "94bfc55e50d9962af2da6d3bc5ee7c205d0df323"
-KMETA = "kernel-meta"
-SRC_URI = " \
-    git://github.com/herrie82/kernel-megi.git;branch=herrie/LuneOS-6.5;protocol=https;name=machine \
-    git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=master;destsuffix=${KMETA};name=meta \
-    file://defconfig \
-    file://0001-dts-pinephone-pro-add-modem-ri.patch \
+SRC_URI += " \
     file://0002-dts-pinephone-pro-remove-modem-node.patch \
-    file://0003-Revert-usb-quirks-Add-USB_QUIRK_RESET-for-Quectel-EG25G-Modem.patch \
-    file://0004-usb-serial-option-add-reset-resume-callback-for-WWAN.patch \
+    file://0003-dts-pinephone-pro-poll-volume-keys-faster.patch \
+    file://0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch \
+    file://0005-power-rk818_battery-stop-treating-every-boot-as-firs.patch \
+    file://defconfig \
+    file://extra.cfg \
 "
 
-KBUILD_DEFCONFIG = ""
-
-# rk3399.inc (pulled in via rock-pi-4.inc) appends a Rockchip kmeta feature to KERNEL_FEATURES for
-# every rk3399 machine:
+# rk3399.inc (pulled in via rock-pi-4.inc) appends a Rockchip kmeta feature to
+# KERNEL_FEATURES for every rk3399 machine:
 #     KERNEL_FEATURES:append:rk3399 = " bsp/rockchip/remove-non-rockchip-arch-arm64.scc"
-# That .scc lives in meta-rockchip's rockchip-kmeta, which only its linux-yocto bbappend puts on
-# SRC_URI, so for this recipe it is a dangling feature and do_kernel_metadata fails with
+# That .scc lives in meta-rockchip's rockchip-kmeta, which only its linux-yocto
+# bbappend puts on SRC_URI, so for this recipe it is a dangling feature and
+# do_kernel_metadata fails with
 #     ERROR: Feature 'bsp/rockchip/remove-non-rockchip-arch-arm64.scc' not found
-# It is not wanted here either: this builds megi's tree against the complete defconfig shipped
-# above, not a kernel-cache assembled config.
+# It is not wanted here either: this builds megi's tree against the complete
+# defconfig shipped above, not a kernel-cache assembled config.
 KERNEL_FEATURES:remove = "bsp/rockchip/remove-non-rockchip-arch-arm64.scc"
-
-# yaml and dtschema are required for 5.16+ device tree validation, libyaml is checked
-# via pkgconfig, so must always be present, but we can wrap the others to make them
-# conditional
-DEPENDS += "gmp-native libmpc-native"
-DEPENDS += "libyaml-native libyaml yaml-cpp python3-dtschema-wrapper-native"

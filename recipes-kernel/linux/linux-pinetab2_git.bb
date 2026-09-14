@@ -1,42 +1,20 @@
-DESCRIPTION = "PineTab2 Linux Kernel"
-SECTION = "kernel"
-LICENSE = "GPL-2.0-only"
-LIC_FILES_CHKSUM = "file://${S}/COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+DESCRIPTION = "PineTab2 Linux Kernel (megi)"
 
-inherit kernel
-require recipes-kernel/linux/linux-yocto.inc
+require linux-megi.inc
 
 COMPATIBLE_MACHINE = "pinetab2"
-
-LINUX_VERSION ?= "6.6.9"
 LINUX_VERSION_EXTENSION = "-pinetab2"
 
-PV = "${LINUX_VERSION}-git"
-
-KERNEL_VERSION_SANITY_SKIP = "1"
-
-LINUX_KMETA_BRANCH = "yocto-dev"
-
-SRCREV_machine = "5e9df83a705290c4d974693097df1da9cbe25854"
-SRCREV_meta = "11390e802ca72f3549b9356f036b17e54afd7a34"
-KMETA = "kernel-meta"
-SRC_URI = " \
-    git://gitlab.com/linux-kernel/stable.git;branch=linux-6.6.y;protocol=https;name=machine \
-    git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=yocto-6.6;destsuffix=${KMETA};name=meta \
-    file://defconfig \
-    file://0001-arm64-dts-rockchip-Add-Pine64-PineTab2-device-trees.patch \
-    file://0002-power-supply-rk817-Fix-battery-capacity-sanity-check.patch \
-    file://0003-drm-panel-Add-BOE-TH101MB31IG002-28A-MIPI-DSI-LCD-pa.patch \
-    file://0004-drm-panel-boe-th101mb31ig002-28a-Various-improvement.patch \
-    file://0005-arm64-dts-rockchip-pinetab2-Apply-BES-changes.patch \
-    file://0006-arm64-dts-rockchip-pinetab2-Add-Bestechnic-BES2600-d.patch \
+# 0001 (PineTab2 device trees) and 0003 (BOE TH101MB31IG002-28A panel driver) were
+# dropped: both are upstream as of 6.9 and are in megi's tree already.
+#
+# The BES2600 node is ours, not megi's: his orange-pi-7.2 comments out the vendor
+# bes2600 driver in favour of the WIP cw1200-based bring-up, whose cw1200_sdio.c
+# claims the same SDIO device (0x2002) as our out-of-tree bes2600-module. See the
+# patch header and CONFIG_CW1200 in the defconfig.
+SRC_URI += " \
+    file://0005-arm64-dts-rockchip-pinetab2-Use-the-LuneOS-BES2600-dr.patch \
     file://0007-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://defconfig \
+    file://extra.cfg \
 "
-
-KBUILD_DEFCONFIG = ""
-
-# yaml and dtschema are required for 5.16+ device tree validation, libyaml is checked
-# via pkgconfig, so must always be present, but we can wrap the others to make them
-# conditional
-DEPENDS += "gmp-native libmpc-native"
-DEPENDS += "libyaml-native libyaml yaml-cpp python3-dtschema-wrapper-native"

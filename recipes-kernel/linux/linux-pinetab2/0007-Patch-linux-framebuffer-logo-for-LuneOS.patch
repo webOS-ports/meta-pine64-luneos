@@ -1,9 +1,11 @@
-From b5ec5e9f6c9cdf4ead19411b82ef8f1ee9145bbb Mon Sep 17 00:00:00 2001
-From: Christophe Chapuis <chris.chapuis@gmail.com>
-Date: Sun, 4 Feb 2024 19:13:36 +0100
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 7 Sep 2026 17:13:51 +0200
 Subject: [PATCH] Patch linux framebuffer logo for LuneOS
 
-Upstream-Status: Inappropriate
+Replace the boot logo with the LuneOS one.
+
+Upstream-Status: Inappropriate [LuneOS branding]
 ---
  drivers/video/logo/logo_linux_clut224.ppm | 2481 ++++++++-------------
  1 file changed, 880 insertions(+), 1601 deletions(-)
@@ -2497,6 +2499,3 @@ index 3c14e43b82fe..17c2e1ac5502 100644
 +0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 +0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 +
--- 
-2.43.0
-

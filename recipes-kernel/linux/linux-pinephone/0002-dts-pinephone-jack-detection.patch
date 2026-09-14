@@ -1,34 +1,44 @@
-From e2a0d1f3af7b051890cb003c9b0df18651b44f42 Mon Sep 17 00:00:00 2001
-From: Martijn Braam <martijn@brixit.nl>
-Date: Mon, 15 Feb 2021 13:18:02 -0800
-Subject: [PATCH] dts: pinephone: jack detection
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 7 Sep 2026 17:13:50 +0200
+Subject: [PATCH] dts: pinephone: jack detection and LuneOS headphone widget
+ naming
 
+Two LuneOS-specific audio changes:
+
+- Enable the analog codec's internal bias resistor. The
+  allwinner,internal-bias-resistor property is still honoured by
+  sound/soc/sunxi/sun50i-codec-analog.c and is needed for reliable
+  headset-button detection on this board.
+
+- LuneOS' audio configuration refers to the headphone widget as
+  "Headphone", not "Headphone Jack". Rename it in widgets, routing and
+  simple-audio-card,jack-pins together, so the jack-pins entry keeps
+  naming a pin that exists and jack detection still binds.
+
+The allwinner,inverted-jack-detection property the previous version of
+this patch also set is gone; jack detection is now driven by the
+jack-type property, which the dtsi already sets to "headset".
+
+Upstream-Status: Inappropriate [LuneOS userspace policy]
 ---
-Upstream-Status: Pending
-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
-index 67c58907ae1b..39fdf96fe95d 100644
+index 9cbdff334ef5..7ab4fcc87a69 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
-@@ -346,11 +346,13 @@ &codec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&aif2_pins>, <&aif3_pins>;
- 	status = "okay";
-+	allwinner,inverted-jack-detection;
- };
+@@ -483,6 +483,7 @@ &codec {
  
  &codec_analog {
  	cpvdd-supply = <&reg_eldo1>;
- 	status = "okay";
 +	allwinner,internal-bias-resistor;
+ 	status = "okay";
  };
  
- &cpu0 {
-@@ -808,11 +810,11 @@ &sound {
- 	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
+@@ -984,11 +985,11 @@ &sound {
+ 	simple-audio-card,aux-devs = <&codec_analog>, <&codec>, <&speaker_amp>;
  	simple-audio-card,widgets = "Microphone", "Headset Microphone",
  				    "Microphone", "Internal Microphone",
 -				    "Headphone", "Headphone Jack",
@@ -41,6 +51,12 @@ index 67c58907ae1b..39fdf96fe95d 100644
  			"Internal Earpiece", "EARPIECE",
  			"Internal Speaker", "Speaker Amp OUTL",
  			"Internal Speaker", "Speaker Amp OUTR",
--- 
-2.30.1
-
+@@ -1003,7 +1004,7 @@ &sound {
+ 			"Headset Microphone", "HBIAS",
+ 			"MIC2", "Headset Microphone";
+ 	simple-audio-card,jack-pins =
+-			"1c22e00.codec", "Headphone Jack",
++			"1c22e00.codec", "Headphone",
+ 			"1c22e00.codec", "Headset Microphone";
+ 	simple-audio-card,jack-pins-mask = <1>, <2>;
+ 
