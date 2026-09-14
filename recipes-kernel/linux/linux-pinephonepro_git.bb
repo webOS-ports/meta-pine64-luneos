@@ -11,6 +11,7 @@ SRC_URI += " \
     file://0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch \
     file://0005-power-rk818_battery-stop-treating-every-boot-as-firs.patch \
     file://defconfig \
+    file://extra.cfg \
 "
 
 # rk3399.inc (pulled in via rock-pi-4.inc) appends a Rockchip kmeta feature to
