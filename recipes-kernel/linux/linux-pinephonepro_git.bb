@@ -9,6 +9,7 @@ SRC_URI += " \
     file://0002-dts-pinephone-pro-remove-modem-node.patch \
     file://0003-dts-pinephone-pro-poll-volume-keys-faster.patch \
     file://0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch \
+    file://0005-power-rk818_battery-stop-treating-every-boot-as-firs.patch \
     file://defconfig \
 "
 
