@@ -47,8 +47,8 @@ SRCREV_FORMAT = "wifinonfree_bes2600_ov5640cam"
 # there any more. rockchip/dptx.bin is now taken from linux-firmware upstream, which
 # carries the same firmware at the SRCREV_kernel already pinned above; it was not
 # byte-compared against the Manjaro copy, which is unreachable. The only remaining
-# Manjaro fetch is BCM4345C5.hcd - Broadcom BT firmware with no linux-firmware
-# equivalent - and it is scoped to the PinePhone Pro at the bottom of this recipe.
+# Manjaro fetch, BCM4345C5.hcd, is now vendored in-layer - see the bottom of this
+# recipe. Nothing here reaches gitlab.manjaro.org any more.
 SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_ap_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_ap_wowlan.bin;name=rtl8723bs_ap_wowlan \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8723bs_wowlan.bin?id=${SRCREV_kernel};downloadfilename=rtl8723bs_wowlan.bin;name=rtl8723bs_wowlan \
@@ -98,7 +98,7 @@ do_install:append:pinephonepro() {
     install -d ${D}${nonarch_base_libdir}/firmware/rockchip/
     install -d ${D}${nonarch_base_libdir}/firmware/brcm/
     install -m 0644 ${UNPACKDIR}/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
-    install -m 0644 ${S}/ap6256bt/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
+    install -m 0644 ${UNPACKDIR}/BCM4345C5.hcd ${D}${nonarch_base_libdir}/firmware/brcm
     install -m 0644 ${S}/wifinonfree/brcm/brcmfmac4345* ${D}${nonarch_base_libdir}/firmware/brcm
     ln -s brcmfmac43456-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43456-sdio.pine64,pinephone-pro.txt
 }
@@ -118,8 +118,20 @@ do_install:append:pinetab2() {
 
 FILES:${PN} = "${nonarch_base_libdir}/firmware"
 
-# PinePhone Pro only: BCM4345C5.hcd has no upstream linux-firmware equivalent.
-SRCREV_FORMAT:append:pinephonepro = "_ap6256bt"
-SRC_URI:append:pinephonepro = " \
-    git://gitlab.manjaro.org/manjaro-arm/packages/community/ap6256-firmware.git;branch=master;protocol=https;name=ap6256bt;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/ap6256bt \
-"
+# PinePhone Pro Bluetooth firmware, shipped in-layer.
+#
+# It used to come from gitlab.manjaro.org, which now resolves IPv6-only and is
+# unreachable, and it has no upstream linux-firmware equivalent. This copy is the
+# one bundled with the okpine PinePhone Pro kernel tree and identifies itself as:
+#
+#     BCM4345C5 Ampak_CL1.5 UART 37.4 MHz BT 5.0 [Baseline: 0021]
+#
+# armbian/firmware carries a different build of the same firmware (Ampak_CL1,
+# Version 0039.0089) with the same 37.4 MHz crystal. CL1 vs CL1.5 is an Ampak
+# module hardware revision, so the CL1.5 file is the one matching this board; if
+# BT ever misbehaves, that armbian build is the first thing to try.
+#
+# Vendored rather than fetched: this layer already ships binary firmware this way
+# for u-boot (rk3568_bl31_*.elf, rk3566_ddr_*.bin), and it removes the last
+# dependency on a host that has already gone down once.
+SRC_URI:append:pinephonepro = " file://BCM4345C5.hcd"
