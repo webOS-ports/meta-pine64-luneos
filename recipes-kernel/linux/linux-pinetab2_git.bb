@@ -43,6 +43,8 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 SRC_URI += " \
     file://0015-arm64-dts-rk3566-pinetab2-wire-WiFi-to-the-LuneOS-be.patch \
     file://0016-arm64-dts-rk3566-pinetab2-adopt-the-DanctNIX-WiFi-po.patch \
+    file://0017-arm64-dts-rk3566-pinetab2-force-the-OTG-port-to-peri.patch \
+    file://0018-arm64-dts-rk3566-pinetab2-limit-the-OTG-port-to-full.patch \
     file://0024-Patch-linux-framebuffer-logo-for-LuneOS.patch \
     file://defconfig \
     file://extra.cfg \
