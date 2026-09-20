@@ -1,0 +1,33 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: run i2c0 at 100 kHz
+
+i2c0 carries the PMIC and the CPU core regulator (TCS4525). The tablet
+resets - a silent power-on reset - when the CPU frequency is changed under
+heavy NEON load, and it stops doing so as soon as the OPP table is made
+voltage-flat, i.e. as soon as cpufreq stops writing the regulator over
+this bus. Neither a settling margin nor forced PWM mode on the regulator
+makes a difference, which points at the transaction rather than the
+voltage step: a corrupted VSEL write is an instant brownout.
+
+Try the bus at standard speed.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -390,7 +390,11 @@
+ };
+ 
+ &i2c0 {
+-	clock-frequency = <400000>;
++	/*
++	 * PMIC and CPU regulator: a corrupted transfer here resets the
++	 * tablet, see the vdd_cpu notes. Standard speed.
++	 */
++	clock-frequency = <100000>;
+ 	status = "okay";
+ 
+ 	vdd_cpu: regulator@1c {

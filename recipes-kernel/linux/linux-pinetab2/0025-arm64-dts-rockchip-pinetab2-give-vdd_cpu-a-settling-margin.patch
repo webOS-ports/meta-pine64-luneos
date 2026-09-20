@@ -1,0 +1,40 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: give vdd_cpu a settling margin
+
+The PineTab 2 resets - a silent power-on reset, nothing in the kernel log,
+CRU_GLB_RST_ST clear afterwards - whenever the CPU frequency is changed
+while a NEON-heavy load is running (libcamera's software ISP is the
+reliable trigger: five-frame capture cycles reset the tablet within a
+handful of iterations under schedutil, at 1.8 GHz, capped at 1.416 GHz or
+floored at 1.416 GHz alike, but survive dozens of cycles with the
+frequency pinned; sustained or bursty load without frequency changes is
+fine).
+
+vdd_cpu is a TCS4525 with regulator-ramp-delay = <2300>, and the OPP core
+waits exactly delta_uV / 2300 us after commanding a new voltage before it
+raises the clock. That leaves no margin at all for the regulator's own
+latency and slew tolerance, so under a heavy load the cores are clocked up
+before the rail has arrived. Wait a fixed 300 us on the way up instead
+(the largest step, 0.825 to 1.15 V, nominally takes 141 us).
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -381,6 +381,13 @@
+ 		regulator-min-microvolt = <800000>;
+ 		regulator-max-microvolt = <1150000>;
+ 		regulator-ramp-delay = <2300>;
++		/*
++		 * The ramp delay alone gives the OPP core no margin between
++		 * the voltage arriving and the clock going up, and the SoC
++		 * resets under load when the clock wins. Settle first.
++		 */
++		regulator-settling-time-up-us = <300>;
++		regulator-settling-time-down-us = <300>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
+ 		vin-supply = <&vcc_sys>;

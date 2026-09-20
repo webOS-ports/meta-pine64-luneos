@@ -1,0 +1,25 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] EXPERIMENT: arm64: dts: rockchip: pinetab2: fastest vdd_cpu slew
+
+Diagnostic. The tablet resets on any VSEL write to the TCS4525 under heavy
+load, however small the step, while reads and all other bus traffic are
+fine. The slew is programmed to the slowest setting (2.3 mV/us); program
+the fastest (18.7 mV/us) so the chip spends the least possible time in a
+DVS transition per write.
+
+Upstream-Status: Inappropriate [diagnostic experiment]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -397,7 +397,7 @@
+ 		regulator-min-microvolt = <800000>;
+ 		regulator-max-microvolt = <1150000>;
+ 		regulator-initial-mode = <FAN53555_MODE_FORCED_PWM>;
+-		regulator-ramp-delay = <2300>;
++		regulator-ramp-delay = <18700>;
+ 		/*
+ 		 * The ramp delay alone gives the OPP core no margin between
+ 		 * the voltage arriving and the clock going up, and the SoC

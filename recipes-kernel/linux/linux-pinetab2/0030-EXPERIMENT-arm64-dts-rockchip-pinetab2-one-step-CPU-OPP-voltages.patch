@@ -1,0 +1,46 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] EXPERIMENT: arm64: dts: rockchip: pinetab2: one-step CPU OPP voltages
+
+Diagnostic only, not for merging. Run every CPU OPP below 1.8 GHz one 6.25 mV step under the 1.8 GHz voltage
+so that every frequency change still writes the regulator over i2c0 but the
+electrical step is negligible. If the resets
+under software-ISP load stop, they are caused by the size of the voltage step;
+if they continue, by the transaction itself.
+
+Upstream-Status: Inappropriate [diagnostic experiment]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff -ruN op_a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi op_b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi	2026-09-19 06:23:36.494639300 +0200
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi	2026-09-19 06:23:36.516164368 +0200
+@@ -281,6 +281,28 @@
+ 	cpu-supply = <&vdd_cpu>;
+ };
+ 
++/* EXPERIMENT: writes without a real step - see the patch description. */
++&cpu0_opp_table {
++	opp-408000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++	opp-600000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++	opp-816000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++	opp-1104000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++	opp-1416000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++	opp-1608000000 {
++		opp-microvolt = <1143750 1143750 1150000>;
++	};
++};
++
+ &cru {
+ 	assigned-clocks = <&pmucru CLK_RTC_32K>, <&cru PLL_GPLL>,
+ 			  <&pmucru PLL_PPLL>, <&cru PLL_VPLL>;

@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Wed, 9 Sep 2026 05:25:41 +0200
+Subject: [PATCH] arm64: dts: rk3566-pinetab2: restore sd-uhs-sdr104 on the WiFi SDIO bus
+
+The BES2600 enumerates on the SDIO bus but its firmware download dies part
+way through, and the chip then stops answering entirely:
+
+    mmc2: new high speed SDIO card at address 0001
+    (NULL device *): wait dpd data ready failed:-110      (SDIO read timed out)
+    (NULL device *): read dpd data failed.
+    (NULL device *): bes2600_sdio_probe failed, func:1
+    bes2600_wlan mmc2:0001:2: probe with driver bes2600_wlan failed with error -123
+
+The LuneOS 6.6 device tree, where WiFi worked, has an &sdmmc1 node identical
+to this one in every respect except that sd-uhs-sdr104 is present; megi's
+tree has it commented out. That is the whole difference:
+
+    6.6:   sd-uhs-sdr104;
+    7.2:   //sd-uhs-sdr104;
+
+Without it the host caps out in high-speed mode - hence "new high speed SDIO
+card" and a 50 MHz bus clock in the log - while vqmmc-supply still holds the
+I/O rail at 1.8V via vcca1v8_pmu. Enumeration and the small register reads
+that follow are tolerant of that; the multi-hundred-kilobyte firmware
+download is where it stops being tolerant, which is exactly where this fails.
+
+Things already ruled out by experiment, recorded so they are not retried:
+
+  - the driver driving the chip's power-enable low (powerup-gpios removed from
+    the bes2600 node in 0005: the message goes away, the DPD failure does not)
+  - the factory calibration data, including the select_efuse field we
+    synthesise (renamed the file away: driver reports "factory cali data get
+    failed" and the DPD stage fails identically)
+  - mmc-pwrseq-bes being absent (pwrseq_bes.o is obj-y, always built)
+
+TESTED 2026-09-09: DOES NOT HELP - do not re-apply without new evidence.
+
+With this patch the host does offer UHS, but the card never completes the
+1.8V handshake, so mmc_set_uhs_voltage() returns -EAGAIN and the core retries
+ten times, power-cycling the chip on each round, before giving up:
+
+    mmc2: Skipping voltage switch
+    mmc2: new high speed SDIO card at address 0001
+
+i.e. the bus ends in exactly the same high-speed 50 MHz mode as without the
+patch, so 6.6 must have landed there too and bus mode is not the difference.
+The DPD failure is unchanged. Net effect is ten extra power cycles at init,
+so this is left out of SRC_URI.
+
+Upstream-Status: Inappropriate [board configuration]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -855,7 +855,7 @@
+ 	pinctrl-0 = <&sdmmc1_bus4
+ 		     &sdmmc1_cmd
+ 		     &sdmmc1_clk>;
+-	//sd-uhs-sdr104;
++	sd-uhs-sdr104;
+ 	vqmmc-supply = <&vcca1v8_pmu>;
+ 	status = "okay";
+ };
