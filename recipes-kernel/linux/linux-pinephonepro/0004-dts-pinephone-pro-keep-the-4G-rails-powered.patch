@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 14 Sep 2026 06:05:00 +0200
+Subject: [PATCH] arm64: dts: rk3399-pinephone-pro: keep the 4G rails powered
+
+0002 drops the quectel,eg25 node because LuneOS drives the modem from
+userspace with eg25-manager. That node was also the only consumer of the
+two modem supplies:
+
+    power-supply = <&vcc_4g>;
+    vbus-supply  = <&vcc_4g_5v>;
+
+Both are plain regulator-fixed with an enable GPIO and no
+regulator-always-on, so with the consumer gone the core never enables
+them. On a running PinePhone Pro:
+
+    /sys/kernel/debug/gpio
+      gpio-23  (  |regulator-vcc-4g-5v ) out lo
+      gpio-23  (  |regulator-vcc-4g    ) out lo
+
+    /sys/kernel/debug/regulator/regulator_summary
+      vcc_4g_5v   0  0   5000mV   0mA
+      vcc_4g      0  0   3800mV   0mA
+
+enable-active-high with the pin driven low means both rails are off, so
+the EG25 has no power at all. eg25-manager then runs its power-on
+sequence against a dead modem, nothing ever enumerates on USB, and ofono
+comes up with no device:
+
+    eg25-manager: Executed power-on sequence
+    eg25-manager: Rescheduling upload since modem isn't online yet, in 30s
+    ofonod: create_rilmodem: ofono_modem_register returned: -19
+
+eg25-manager owns the modem's power sequencing through PWRKEY, RESET and
+W_DISABLE#, not through these rails - it expects them to be present. Mark
+them always-on so the supply is there for it to sequence.
+
+Upstream-Status: Inappropriate [LuneOS userspace policy]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+--- a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+@@ -427,6 +427,8 @@
+ 		gpio = <&gpio1 RK_PC7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&vcc_4g_5v_en>;
++		regulator-always-on;
++		regulator-boot-on;
+ 		regulator-name = "vcc_4g_5v";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+@@ -439,6 +441,8 @@
+ 		gpio = <&gpio4 RK_PC7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&vcc_4g_en>;
++		regulator-always-on;
++		regulator-boot-on;
+ 		regulator-name = "vcc_4g";
+ 		regulator-min-microvolt = <3800000>;
+ 		regulator-max-microvolt = <3800000>;

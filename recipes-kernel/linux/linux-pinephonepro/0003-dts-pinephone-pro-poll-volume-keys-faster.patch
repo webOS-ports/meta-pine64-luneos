@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Tue, 8 Sep 2026 19:23:01 +0200
+Subject: [PATCH] arm64: dts: rk3399-pinephone-pro: poll the volume keys faster
+
+The hardware volume keys register only intermittently: a press does
+something most of the time, but a fair share of presses are simply lost.
+
+The thresholds are not the problem. Sampling the SARADC channel directly at
+50ms while pressing each key six times gives:
+
+    Volume Up     raw 1-3      ~1-5 mV      (press-threshold 2000 uV)
+    Volume Down   raw 168-181  ~295-318 mV  (press-threshold 300000 uV)
+    idle          raw 1020     ~1792 mV     (keyup-threshold 1600000 uV)
+
+so both thresholds sit right on top of the measured values, and the
+keyup value is far away from both. adc_keys_poll() picks the nearest
+threshold and discards the result only when keyup is nearer, which is
+never the case for a real press here.
+
+What does go wrong is how long a press lasts. Those six presses per key
+produced 19 samples of Up and 11 of Down at a 50ms sampling period, i.e.
+roughly 158ms and 92ms of contact per press. adc-keys is a polled input
+device, so with poll-interval = 100 a ~92ms press can begin and end
+entirely between two polls and never be observed at all. Nothing is
+debounced away and no error is logged; the key just does nothing.
+
+Poll at 30ms instead, which puts at least three samples inside even the
+shortest press measured, at the cost of ~33 SARADC reads a second.
+
+Upstream-Status: Inappropriate [configuration]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+--- a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts	2026-09-08 19:22:45.952278813 +0200
++++ b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts	2026-09-08 19:22:45.944058544 +0200
+@@ -36,7 +36,7 @@
+ 		io-channels = <&saradc 1>;
+ 		io-channel-names = "buttons";
+ 		keyup-threshold-microvolt = <1600000>;
+-		poll-interval = <100>;
++		poll-interval = <30>;
+ 
+ 		button-up {
+ 			label = "Volume Up";
