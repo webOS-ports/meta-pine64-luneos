@@ -1,0 +1,51 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] regulator: fan53555: cache the registers
+
+Every voltage change is a read-modify-write of the VSEL register through
+an uncached regmap. That register also holds the buck enable bit, so a
+read that comes back corrupted turns the next DVFS step into a write that
+switches the CPU rail off. On the PineTab 2 (TCS4525 on the i2c bus it
+shares with the PMIC) the tablet resets - a silent power-on reset - within
+a few frequency changes under heavy NEON load, and it stops doing so as
+soon as no voltage writes happen at all; the size of the step does not
+matter, one 6.25 mV step resets it just the same.
+
+Cache the registers: the DVFS hot path becomes a single write, and a
+transfer that goes wrong can no longer feed back into the enable bit.
+The monitor register stays volatile.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff -ruN rc_a/drivers/regulator/fan53555.c rc_b/drivers/regulator/fan53555.c
+--- a/drivers/regulator/fan53555.c	2026-09-19 07:30:14.463101636 +0200
++++ b/drivers/regulator/fan53555.c	2026-09-19 07:44:43.602869319 +0200
+@@ -627,9 +627,26 @@
+ 	return PTR_ERR_OR_ZERO(rdev);
+ }
+ 
++static bool fan53555_volatile_reg(struct device *dev, unsigned int reg)
++{
++	/* The monitor register reports live status; everything else is ours. */
++	return reg == FAN53555_MONITOR;
++}
++
++/*
++ * Cache the registers. Every voltage change is a read-modify-write of the
++ * VSEL register, which also carries the buck enable bit, so a read that
++ * comes back wrong turns the next DVFS step into a power-off of the CPU
++ * rail. With a cache the hot path is write-only, and it is one transfer
++ * instead of two on a bus shared with the PMIC.
++ */
+ static const struct regmap_config fan53555_regmap_config = {
+ 	.reg_bits = 8,
+ 	.val_bits = 8,
++	.max_register = TCS4525_COMMAND,
++	.volatile_reg = fan53555_volatile_reg,
++	/* a tree cache: a register never read comes from the hardware once */
++	.cache_type = REGCACHE_MAPLE,
+ };
+ 
+ static struct fan53555_platform_data *fan53555_parse_dt(struct device *dev,

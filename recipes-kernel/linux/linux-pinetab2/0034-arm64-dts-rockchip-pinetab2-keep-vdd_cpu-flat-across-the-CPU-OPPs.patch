@@ -1,0 +1,62 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: keep vdd_cpu flat across the CPU OPPs
+
+The PineTab 2 resets - a silent power-on reset, nothing in the kernel log,
+CRU reset status clear, PMIC on/off-source unchanged - whenever cpufreq
+changes the CPU voltage while the cores are under heavy NEON load;
+libcamera's software ISP triggers it within a handful of five-frame capture
+cycles under schedutil. The same load runs indefinitely with the frequency
+pinned.
+
+Everything around the voltage write was tried and made no difference:
+a settling margin after the write, forced PWM mode on the regulator, i2c0
+at 100 kHz, the slowest and the fastest slew, a register cache so the hot
+path is a single write, and a table whose steps are one 6.25 mV LSB. Heavy
+read traffic to the regulator and to the PMIC under the same load is fine.
+A voltage-flat table - no VSEL write at all - survives every test. So the
+TCS4525 on this board does not tolerate a voltage-change command under
+load, and the fix is not to issue one: run every OPP at the 1.8 GHz
+voltage. It costs some idle power; it keeps the tablet up.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -280,6 +280,34 @@
+ &cpu3 {
+ 	cpu-supply = <&vdd_cpu>;
+ };
++
++/*
++ * Run every CPU OPP at the 1.8 GHz voltage. The TCS4525 feeding the cores
++ * cannot take a voltage-change command while the cores are loaded: the
++ * tablet power-cycles within a few DVFS steps under NEON-heavy work
++ * (libcamera's software ISP is the reliable trigger). Frequency changes
++ * without a voltage write are fine, so keep vdd_cpu flat.
++ */
++&cpu0_opp_table {
++	opp-408000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++	opp-600000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++	opp-816000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++	opp-1104000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++	opp-1416000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++	opp-1608000000 {
++		opp-microvolt = <1150000 1150000 1150000>;
++	};
++};
+ 
+ &cru {
+ 	assigned-clocks = <&pmucru CLK_RTC_32K>, <&cru PLL_GPLL>,

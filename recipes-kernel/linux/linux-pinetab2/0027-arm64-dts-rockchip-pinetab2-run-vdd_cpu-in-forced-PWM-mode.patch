@@ -1,0 +1,32 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: run vdd_cpu in forced PWM mode
+
+The TCS4525 feeding the CPU cores sees large, fast load steps (NEON work
+starting on all four cores) coinciding with DVFS voltage changes, and the
+tablet resets under that combination. Keep the regulator in PWM at all
+times so it does not have to leave light-load PFM operation in the middle
+of a load step.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -5,6 +5,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/leds/common.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/regulator/fcs,fan53555.h>
+ #include <dt-bindings/soc/rockchip,vop2.h>
+ #include <dt-bindings/usb/pd.h>
+ #include "rk3566.dtsi"
+@@ -395,6 +396,7 @@
+ 		regulator-name = "vdd_cpu";
+ 		regulator-min-microvolt = <800000>;
+ 		regulator-max-microvolt = <1150000>;
++		regulator-initial-mode = <FAN53555_MODE_FORCED_PWM>;
+ 		regulator-ramp-delay = <2300>;
+ 		regulator-always-on;
+ 		regulator-boot-on;

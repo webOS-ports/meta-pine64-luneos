@@ -57,6 +57,10 @@ SRC_URI += " \
     file://0022-arm64-dts-rockchip-pinetab2-describe-the-front-camera.patch \
     file://0023-media-i2c-ov5648-expose-the-orientation-and-rotation-properties.patch \
     file://0024-arm64-dts-rockchip-pinetab2-reserve-memory-for-ramoops.patch \
+    file://0026-regulator-fan53555-let-the-device-tree-select-forced-PWM-mode.patch \
+    file://0027-arm64-dts-rockchip-pinetab2-run-vdd_cpu-in-forced-PWM-mode.patch \
+    file://0032-regulator-fan53555-cache-the-registers.patch \
+    file://0034-arm64-dts-rockchip-pinetab2-keep-vdd_cpu-flat-across-the-CPU-OPPs.patch \
     file://0035-media-rkcif-do-not-service-streams-while-suspended-or-stopped.patch \
     file://0036-media-rkisp1-add-rk3566-rk3568-support.patch \
     file://0037-phy-rockchip-inno-csidphy-route-a-split-lane-pair-to-the-ISP.patch \
