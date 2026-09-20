@@ -4,7 +4,29 @@ LIC_FILES_CHKSUM = "file://${UNPACKDIR}/LICENCE.rtlwifi_firmware.txt;md5=00d06cf
 
 COMPATIBLE_MACHINE = "pinephonepro|pinephone|pinetab2"
 
-RDEPENDS:${PN} = "wireless-regdb"
+# wireless-regdb splits into two mutually-conflicting packages:
+#
+#   wireless-regdb          -> /usr/lib/crda/regulatory.bin   (legacy CRDA)
+#   wireless-regdb-static   -> /lib/firmware/regulatory.db{,.p7s}
+#
+# Only the -static one is loadable by the kernel. Depending on the plain
+# package left the device with no regdb at all, so cfg80211 fell back to the
+# built-in "world" domain, which is NO-IR on 5GHz and 2.4GHz ch12-14:
+#
+#   faux_driver regulatory: Direct firmware load for regulatory.db failed, -2
+#   brcmfmac: brcmf_set_channel: set chanspec 0xd022 fail, reason -52
+#
+# The card then associates (the fullmac firmware still hears beacons) but
+# cannot transmit EAPOL, so the WPA handshake dies and the UI sits forever on
+# "Connecting":
+#
+#   wlan0: Associated with cc:28:aa:a1:45:84
+#   wlan0: Authentication with cc:28:aa:a1:45:84 timed out.
+#
+# The kernel is built with CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=y, so the
+# .p7s signature that ships alongside the .db is required too - another
+# reason the CRDA package cannot substitute.
+RDEPENDS:${PN} = "wireless-regdb-static"
 
 SRCREV_kernel = "e6b9001e91110c654573b8f8e2db6155d10d3b57"
 SRCREV_ap6256bt = "a30bf312b268eab42d38fab0cc3ed3177895ff5d"
