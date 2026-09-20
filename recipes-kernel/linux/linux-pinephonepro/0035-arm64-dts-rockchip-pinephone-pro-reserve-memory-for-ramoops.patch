@@ -1,0 +1,67 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sun, 20 Sep 2026 05:45:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinephone-pro: reserve memory for ramoops
+
+The phone has no reachable serial console and CONFIG_PSTORE was off, so a
+kernel oops or a hang leaves nothing behind at all: the journal cannot be
+flushed once the machine stops, and the next boot starts with a clean slate.
+
+Measured on 2026-09-19: the phone entered suspend at 21:39:01, the kernel
+printed its "Filesystems sync" line, and nothing followed. It stayed that way
+for eight hours - USB still enumerated, no response on any interface - and the
+only way out was a forced power-off. With no crash log there is no way to see
+which device or task stalled on the way into suspend.
+
+Reserve a megabyte for ramoops so the console ring survives a reset. Unlike
+the PineTab2 (rk3566), which can use the Rockchip BSP window at 0x110000,
+RK3399 gives the kernel no RAM below 0x00200000 - the first two megabytes
+belong to ATF - so a fixed low address is not available here. Let the kernel
+place the region instead: reserved-memory allocates it early and
+deterministically for a given kernel and memory map, which is all pstore needs
+to find its records again after a warm reset.
+
+console-size dominates the split on purpose: a hang produces no oops record,
+and the console ring is then the only evidence of what the kernel was doing.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+@@ -31,6 +31,35 @@
+ 		stdout-path = "serial2:115200n8";
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/*
++		 * Keep a crash log across a reset. RK3399 gives the kernel no
++		 * RAM below 0x00200000 - the first two megabytes belong to ATF
++		 * - so the PineTab2's BSP window at 0x110000 is not available
++		 * here. This address is where the kernel itself placed the
++		 * region when asked to allocate one, well clear of the image
++		 * u-boot loads at 0x02080000; a fixed reg is required because
++		 * the ramoops driver looks the resource up in the device tree
++		 * and refuses a dynamically allocated node ("failed to locate
++		 * DT /reserved-memory resource", -EINVAL).
++		 *
++		 * console-size dominates on purpose: a hang produces no oops
++		 * record and the console ring is then the only evidence.
++		 */
++		ramoops@1ff00000 {
++			compatible = "ramoops";
++			reg = <0x0 0x1ff00000 0x0 0x00100000>;
++			console-size = <0x80000>;
++			record-size = <0x20000>;
++			pmsg-size = <0x20000>;
++			ftrace-size = <0x00000>;
++		};
++	};
++
+ 	adc-keys {
+ 		compatible = "adc-keys";
+ 		io-channels = <&saradc 1>;
