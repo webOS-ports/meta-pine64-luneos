@@ -1,0 +1,16 @@
+[Unit]
+Description=LuneOS USB gadget (ECM network at 172.16.42.2)
+# configfs must be mounted before we can create the gadget.
+Requires=sys-kernel-config.mount
+After=sys-kernel-config.mount
+# Bring the interface up before the network stack starts looking at it.
+Before=connman.service network.target
+ConditionPathIsDirectory=/sys/kernel/config/usb_gadget
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/luneos-usb-gadget.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
