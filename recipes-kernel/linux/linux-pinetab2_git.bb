@@ -41,6 +41,8 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 SRC_URI += " \
     file://0005-arm64-dts-rockchip-pinetab2-Use-the-LuneOS-BES2600-dr.patch \
     file://0006-arm64-dts-rockchip-pinetab2-use-DanctNIX-wifi-power.patch \
+    file://0009-arm64-dts-rockchip-pinetab2-let-the-phy-drive-otg.patch \
+    file://0010-arm64-dts-rockchip-pinetab2-limit-otg-to-full-speed.patch \
     file://0007-Patch-linux-framebuffer-logo-for-LuneOS.patch \
     file://defconfig \
     file://extra.cfg \

@@ -1,0 +1,66 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Wed, 9 Sep 2026 21:27:55 +0200
+Subject: [PATCH] arm64: dts: rk3566-pinetab2: limit the OTG port to full speed
+
+With 0009 the gadget finally drives D+ and the host sees the device, but
+enumeration still dies immediately:
+
+    host:   usb 1-1: new high-speed USB device number 126 using xhci_hcd
+            usb 1-1: device descriptor read/64, error -71
+    device: dwc3_event: Reset [U0]
+            dwc3_event: Connection Done [U0]
+            ep0out/ep0in 'Set Endpoint Configuration' --> Successful
+            dwc3_event: Erratic Error [U0]
+            dwc3_event: Erratic Error [U0]   (~115 per second, forever)
+
+Reset and chirp both succeed and ep0 is armed, then the core reports the
+PHY is handing it invalid line states and the host's first SETUP never
+arrives. Forcing DCFG.devspd to full speed at runtime - nothing else
+changed - enumerates instantly and completely:
+
+    usb 1-1: new full-speed USB device number 11
+    usb 1-1: Product: LuneOS Device
+    cdc_ether 1-1:1.0 usb0: CDC Ethernet Device
+
+so the gadget, the DT and dwc3 are all fine; only the USB2 high-speed
+physical layer is broken on this port.
+
+The following were all measured on the device and made no difference at
+high speed (each retried with a fresh RUN_STOP cycle):
+
+  - PHY HS eye height (0x30 bits 6:4) swept 0,1,4,6,7
+  - PHY differential receiver (0x30 bit 2) on and off
+  - PHY pre-emphasis (0x00 bits 2:0) swept 0,1,2,4,7
+  - GUSB2PHYCFG dis_enblslpm and dis-u2-freeclk-exists
+  - GUCTL1 parkmode-disable-hs and tx-ipgap-linecheck-dis
+  - DCFG LPM_CAP off
+
+and the configuration the driver does apply is confirmed correct in
+hardware: RK3568 PHY tuning present (0x00=0x04, 0x400=0x04, 0x30=0x61),
+GUSB2PHYCFG SUSPHY=0 PHYIF=16-bit USBTRDTIM=5, GUCTL refclkper=41ns,
+GFLADJ 240MHz-decr=10, GRF opmode=0 phy_sus=0 bvalid=1 avalid=1 id=1.
+The OTG and host port register blocks of usb2phy0 are byte-identical
+apart from the deliberate 0x30 tuning.
+
+Insensitivity to every analog knob, combined with chirp succeeding and
+clocked data failing, points at the board rather than the SoC. Cap the
+port at full speed so USB networking and MTP work at all; drop this
+patch if the high-speed path is ever fixed.
+
+Upstream-Status: Inappropriate [hardware-specific workaround]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -898,6 +898,7 @@
+ /* OTG port controller */
+ &usb_host0_xhci {
+ 	dr_mode = "peripheral";
++	maximum-speed = "full-speed";
+ 	status = "okay";
+ };
+ 
