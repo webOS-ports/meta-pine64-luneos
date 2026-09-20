@@ -108,6 +108,19 @@ do_install:append:pinetab2() {
     install -m 0644 ${UNPACKDIR}/dptx.bin ${D}${nonarch_base_libdir}/firmware/rockchip/dptx.bin
     install -d ${D}${nonarch_base_libdir}/firmware/bes2600/
     install -m 0644 ${S}/bes2600/firmware/bes2600/bes2600_factory.txt ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
+    # The BES2600 driver builds with STANDARD_FACTORY_EFUSE_FLAG=y by default, so
+    # its sscanf format expects 31 fields ending in
+    #     ##select_efuse_flag\nselect_efuse:%hx\n%%
+    # The file pine64 ships stops after the ##bt section and has only 30, so the
+    # parse fails and the probe never gets past "factory cali data get failed":
+    #     bes2600_factory.txt parse fail
+    # Append the missing section. 0 is the value the driver itself uses when the
+    # field is absent or the flag is compiled out (bes2600_factory.c:250, :538),
+    # so this changes no calibration behaviour - it only makes the file parseable.
+    if ! grep -q "select_efuse" ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt; then
+        sed -i 's|^%%$|##select_efuse_flag\nselect_efuse:0x0\n%%|' \
+            ${D}${nonarch_base_libdir}/firmware/bes2600/bes2600_factory.txt
+    fi
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_boot_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_boot_sdio.bin
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio.bin
     install -m 0644 ${S}/bes2600/firmware/bes2600/best2002_fw_sdio_btrf.bin ${D}${nonarch_base_libdir}/firmware/bes2600/best2002_fw_sdio_btrf.bin
