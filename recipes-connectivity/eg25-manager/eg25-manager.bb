@@ -15,6 +15,7 @@ SRC_URI = " \
     git://gitlab.com/mobian1/devices/eg25-manager.git;protocol=https;branch=master \
     file://0001-Fix-udev-dir-for-LuneOS.patch \
     file://0002-Add-VoLTE-configuration.patch \
+    file://0003-toml-let-expand-make-the-first-allocation.patch \
     file://eg25-manager.service \
 "
 

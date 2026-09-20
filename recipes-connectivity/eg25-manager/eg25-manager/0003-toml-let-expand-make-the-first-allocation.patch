@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 14 Sep 2026 05:50:00 +0200
+Subject: [PATCH] toml: let expand() make the first allocation
+
+eg25-manager aborts on startup on every device and with every config file:
+
+    Opening config file: /usr/share/eg25-manager/pine64,pinephone-pro.toml
+    unable to parse config file: out of memory
+    eg25-manager.service: Main process exited, code=dumped, status=6/ABRT
+
+The config is not at fault - an empty file fails identically, and the
+shipped ones parse fine with a standards-compliant parser.
+
+toml_parse_file() starts with an empty buffer and grows it:
+
+    int   bufsz = 0;
+    char *buf   = 0;
+    while (!feof(fp)) {
+        if (off == bufsz) {
+            int   xsz = bufsz + 1000;
+            char *x = expand(buf, bufsz, xsz);
+            if (!x) {
+                snprintf(errbuf, errbufsz, "out of memory");
+
+so the very first expand() is always called with p == NULL. Commit
+f978b77 ("src: fix issues reported by clang-tidy") added
+
+    if (!p)
+        return 0;
+
+to the top of expand(), presumably to avoid memcpy(s, NULL, 0), which is
+undefined behaviour even for a zero length. But expand() is the allocator
+here, not just a grower: returning early on a NULL input means the buffer
+is never allocated at all, toml_parse_file() reports "out of memory" and
+g_error() aborts the process. No config file can ever be read.
+
+Keep the intent - never memcpy from NULL - but allocate first and only
+copy when there is something to copy.
+
+Without this the modem is never powered on, so ofono comes up with no
+device:
+
+    msm-modem-uim-selection.sh: Waited 45 seconds for modem device to appear
+    msm-modem-uim-selection.sh: 2 No modem available.
+    ofonod: create_rilmodem: ofono_modem_register returned: -19
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ src/toml.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+--- a/src/toml.c
++++ b/src/toml.c
+@@ -397,15 +397,15 @@
+ static void *expand(void *p, int sz, int newsz)
+ {
+     void *s;
+-    if (!p)
+-        return 0;
+ 
+     s = MALLOC(newsz);
+     if (!s)
+         return 0;
+ 
+-    memcpy(s, p, sz);
+-    FREE(p);
++    if (p) {
++        memcpy(s, p, sz);
++        FREE(p);
++    }
+     return s;
+ }
+ 
