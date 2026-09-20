@@ -64,3 +64,8 @@ SRC_URI += " \
     file://defconfig \
     file://extra.cfg \
 "
+
+#    file://0020-regulator-fan53555-let-the-device-tree-select-forced.patch
+#    file://0021-arm64-dts-rockchip-pinetab2-run-vdd_cpu-in-forced-PW.patch
+#    file://0022-regulator-fan53555-cache-the-registers.patch
+#    file://0023-arm64-dts-rockchip-pinetab2-keep-vdd_cpu-flat-across.patch
