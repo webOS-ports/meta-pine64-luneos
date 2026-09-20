@@ -41,6 +41,20 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 # reset - otherwise the BES2600 never powers on.
 #
 SRC_URI += " \
+    file://0001-media-i2c-ov5648-add-the-controls-libcamera-requires.patch \
+    file://0002-media-i2c-ov5648-do-not-refuse-analogue-gain-while-A.patch \
+    file://0003-media-i2c-ov5648-keep-cached-control-values-while-po.patch \
+    file://0004-media-i2c-ov5648-expose-the-orientation-and-rotation.patch \
+    file://0005-media-i2c-ov5648-report-the-subsampled-modes-GBRG-Ba.patch \
+    file://0006-media-i2c-ov5648-clamp-exposure-to-the-mode-s-frame-.patch \
+    file://0007-media-i2c-add-a-driver-for-the-GalaxyCore-GC02M2.patch \
+    file://0008-media-dw-mipi-csi2rx-always-report-progressive-frame.patch \
+    file://0009-media-rkcif-honour-the-mbus_code-filter-when-enumera.patch \
+    file://0010-media-rkcif-do-not-service-streams-while-suspended-o.patch \
+    file://0011-phy-rockchip-inno-csidphy-support-the-rk3568-split-m.patch \
+    file://0012-media-dw-mipi-csi2rx-allow-two-sensors-on-the-sink-p.patch \
+    file://0013-phy-rockchip-inno-csidphy-pick-lane-pair-from-the-ac.patch \
+    file://0014-arm64-dts-rockchip-rk3566-pinetab2-add-front-and-rea.patch \
     file://0015-arm64-dts-rk3566-pinetab2-wire-WiFi-to-the-LuneOS-be.patch \
     file://0016-arm64-dts-rk3566-pinetab2-adopt-the-DanctNIX-WiFi-po.patch \
     file://0017-arm64-dts-rk3566-pinetab2-force-the-OTG-port-to-peri.patch \
