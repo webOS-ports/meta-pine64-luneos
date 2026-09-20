@@ -10,6 +10,7 @@ SRC_URI += " \
     file://0003-dts-pinephone-pro-poll-volume-keys-faster.patch \
     file://0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch \
     file://0005-power-rk818_battery-stop-treating-every-boot-as-firs.patch \
+    file://0035-arm64-dts-rockchip-pinephone-pro-reserve-memory-for-ramoops.patch \
     file://defconfig \
     file://extra.cfg \
 "
