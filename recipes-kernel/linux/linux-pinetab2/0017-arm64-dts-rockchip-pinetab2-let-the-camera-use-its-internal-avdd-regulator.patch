@@ -1,0 +1,45 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Thu, 18 Sep 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: let the camera use its
+ internal AVDD regulator
+
+Naming an avdd-supply makes ov5648_sensor_init() call
+
+  ov5648_avdd_internal_power(sensor, !sensor->avdd)
+
+which sets BP_REGULATOR_N in register 0x3013 and bypasses the sensor's own
+analogue regulator in favour of the external rail. On the PineTab 2 that
+leaves the analogue section unpowered: the digital side is perfect - the
+built-in random-data pattern covers the full 10-bit range and the colour bar
+pattern comes out pixel-exact with the bar edges at exact 240 pixel intervals
+- while the pixel array reads out nothing but fixed column noise that does not
+change when the sensor is covered or pointed somewhere else.
+
+Clearing that bit by hand on a streaming sensor takes the frame mean from 49
+to 636 out of 1023 and produces a normal image, so drop the supply and let the
+sensor regulate AVDD itself.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff -ruN av_a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi av_b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi	2026-09-18 10:45:11.333839913 +0200
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi	2026-09-18 10:45:11.350647567 +0200
+@@ -638,7 +638,15 @@
+ 		 */
+ 		power-domains = <&power RK3568_PD_VI>;
+ 
+-		avdd-supply = <&vcc2v8_dvp>;
++		/*
++		 * No avdd-supply: naming one makes the driver bypass the
++		 * sensor's internal analogue regulator, and the analogue
++		 * section then stays dead on this board - the digital side
++		 * works perfectly (the built-in test patterns come out
++		 * pixel-exact) while the pixel array reads out nothing but
++		 * fixed column noise. Letting the sensor run its own
++		 * regulator takes the frame mean from 49 to 636.
++		 */
+ 		dvdd-supply = <&vdd1v2_dvp>;
+ 		dovdd-supply = <&vcc1v8_dvp>;
+ 		powerdown-gpios = <&gpio4 RK_PB2 GPIO_ACTIVE_LOW>;

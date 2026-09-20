@@ -1,0 +1,95 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 20 Sep 2026 09:00:00 +0200
+Subject: [PATCH] media: rkisp1: add rk3566/rk3568 support
+
+The rk3566/rk3568 carries the same ISP1 generation as the px30 ("V12"):
+it has the internal MIPI CSI-2 receiver, the self path, the dual-crop
+block and a dedicated BLS, laid out at the register offsets the driver
+already knows, and it is fed the same way. Describe it with a small info
+struct - three interrupts and three clocks, no pclk - reusing the px30
+interrupt-service split and the V12 register paths, and match it on a new
+"rockchip,rk3568-cif-isp" compatible.
+
+On the rk3568 the ISP's IOMMU is a sub-block that lives inside the ISP
+register window (at offset 0x1a00) rather than just past it, so it has
+its own device node whose driver reserves that range. Map the ISP
+registers with devm_ioremap() instead of the exclusive
+devm_platform_ioremap_resource(), which would otherwise fail with -EBUSY
+over the shared window; the other variants place the MMU outside the ISP
+window and are unaffected.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
+@@ -615,12 +615,36 @@
+ 	},
+ };
+ 
++/*
++ * The rk3566/rk3568 ISP is the same ISP1 generation as the px30 ("V12"): it
++ * has the internal MIPI CSI-2 receiver, the self path, the dual-crop block and
++ * a dedicated BLS, and it is fed the same way, so the px30 register paths drive
++ * it. It has three interrupts and three clocks (no pclk), the ov5648 that hangs
++ * off it tops out at 5 MP, and the px30 3264x2448 limit already covers that.
++ */
++static const struct rkisp1_info rk3568_isp_info = {
++	.num_clocks = 3,
++	.isrs = px30_isp_isrs,
++	.isr_size = ARRAY_SIZE(px30_isp_isrs),
++	.isp_ver = RKISP1_V12,
++	.features = RKISP1_FEATURE_MIPI_CSI2
++		  | RKISP1_FEATURE_SELF_PATH
++		  | RKISP1_FEATURE_DUAL_CROP
++		  | RKISP1_FEATURE_BLS,
++	.max_width = 3264,
++	.max_height = 2448,
++};
++
+ static const struct of_device_id rkisp1_of_match[] = {
+ 	{
+ 		.compatible = "rockchip,px30-cif-isp",
+ 		.data = &px30_isp_info,
+ 	},
+ 	{
++		.compatible = "rockchip,rk3568-cif-isp",
++		.data = &rk3568_isp_info,
++	},
++	{
+ 		.compatible = "rockchip,rk3399-cif-isp",
+ 		.data = &rk3399_isp_info,
+ 	},
+@@ -713,6 +737,7 @@
+ 	struct device *dev = &pdev->dev;
+ 	struct rkisp1_device *rkisp1;
+ 	struct v4l2_device *v4l2_dev;
++	struct resource *res;
+ 	unsigned int i;
+ 	u64 dma_mask;
+ 	int ret, irq;
+@@ -737,9 +762,20 @@
+ 
+ 	mutex_init(&rkisp1->stream_lock);
+ 
+-	rkisp1->base_addr = devm_platform_ioremap_resource(pdev, 0);
+-	if (IS_ERR(rkisp1->base_addr))
+-		return PTR_ERR(rkisp1->base_addr);
++	/*
++	 * Map the registers without reserving the region: on the rk3568 the
++	 * ISP's IOMMU is a sub-block sitting inside the ISP register window
++	 * (at offset 0x1a00), so it has its own device node and driver that
++	 * claims that range. An exclusive devm_platform_ioremap_resource()
++	 * over the whole window would then fail with -EBUSY. Other variants
++	 * place the MMU just past the ISP window and are unaffected.
++	 */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENODEV;
++	rkisp1->base_addr = devm_ioremap(dev, res->start, resource_size(res));
++	if (!rkisp1->base_addr)
++		return -ENOMEM;
+ 
+ 	for (unsigned int il = 0; il < ARRAY_SIZE(rkisp1->irqs); ++il)
+ 		rkisp1->irqs[il] = -1;

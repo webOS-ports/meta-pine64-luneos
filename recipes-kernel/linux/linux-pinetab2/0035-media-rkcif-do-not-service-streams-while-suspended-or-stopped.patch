@@ -1,0 +1,238 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sun, 20 Sep 2026 00:00:00 +0200
+Subject: [PATCH] media: rkcif: do not service streams while suspended or stopped
+
+The PineTab2 rebooted with the LuneOS camera application open. The oops
+in pstore is reproducible in shape and always the same:
+
+  Unable to handle kernel NULL pointer dereference at virtual address 00000000000004e0
+  CPU: 0 PID: 29405 Comm: kworker/u16:143
+  Workqueue: pm pm_runtime_work
+  pc : rkcif_stream_pingpong+0x24/0x120
+  lr : rkcif_mipi_isr+0x140/0x1e0
+   rkcif_isr / __handle_irq_event_percpu / handle_irq_event / gic_handle_irq
+   el1h_64_irq
+   reset_control_assert+0x84/0x1f8
+   rkcif_runtime_suspend+0x20/0x68
+   genpd_runtime_suspend / rpm_suspend+0xe4/0x660 / pm_runtime_work+0xbc/0xd0
+  x2 : 0000000000000000  x0 : ffff0001044a37a0  x19: ffff0001044a3798
+  Code: aa0003f3 b9803c00 8b000e60 f9401402 (39538040)
+
+The faulting instruction is "ldrb w0, [x2, #0x4e0]", reached through
+"ldrsw x0, [x19, #60]" (stream->frame_phase) and "ldr x2, [x0, #40]"
+(stream->buffers[]), so the dereference is buffer->is_dummy on the very
+first line of rkcif_stream_pingpong() and x0 = x19 + 8 says the phase was
+1: stream->buffers[1] was NULL. That is the value
+rkcif_stream_return_all_buffers() leaves behind, and the value a stream
+that was never started has from the zeroed allocation.
+
+The interrupted context names the cause. The handler was entered while
+the pm_runtime_work worker was inside rkcif_runtime_suspend(), between
+reset_control_assert() and reset_control_deassert(). The interrupt is
+requested with IRQF_SHARED for the whole lifetime of the driver, so it
+also runs for interrupts raised by the other devices on the line (the
+same log shows dwmmc_rockchip complaining about interrupt latency in that
+window). rkcif_mipi_isr() and rkcif_dvp_isr() read the interrupt status
+registers unconditionally, and a block that is held in reset with its
+clocks being gated does not return a status - it returns garbage, in
+which the frame-end bits of every stream appear set. The handler then
+invents a frame end for streams that are not streaming at all and walks
+into their torn-down ping-pong state.
+
+Gate the shared handler on runtime PM. pm_runtime_get_if_active() is
+atomic-context safe (it takes dev->power.lock with interrupts disabled)
+and returns 0 while the status is RPM_SUSPENDING or RPM_SUSPENDED, so the
+handler leaves the hardware alone exactly when it must; when it succeeds
+it holds a reference, so rpm_suspend() cannot start the reset underneath
+a handler that is already reading registers. A negative return means
+runtime PM is disabled for the device and the power state is unknown,
+which is equally a reason not to touch it.
+
+That alone still leaves the stream state reachable from a genuinely late
+frame end, because the only per-stream test in either handler is
+stream->stopping, which is false both before the first start_streaming()
+and after stop_streaming() has cleared it. Track whether the ping-pong
+buffers are valid and skip the stream otherwise. A plain NULL test on
+stream->buffers[] would not do: when an entry holds the dummy buffer,
+rkcif_stream_return_all_buffers() leaves the pointer in place while
+freeing the DMA memory behind it, so the handler would happily program a
+freed address into the hardware. The flag is set by
+rkcif_stream_init_buffers() once both slots are filled and cleared by
+rkcif_stream_return_all_buffers() before anything is released, which
+covers the start_streaming() error path as well. Clearing it is followed
+by synchronize_irq() so that a handler already running on another CPU has
+finished before the buffers are returned, and the dummy entries are now
+cleared too instead of being left dangling.
+
+Finally, fix the teardown order in rkcif_stream_stop_streaming(). It
+dropped the runtime PM reference before returning the buffers, which
+queues the asynchronous suspend - and with it the CIF reset - while the
+buffers are still programmed into the hardware. That is precisely the
+interleaving in the trace. Release the reference last, mirroring
+rkcif_stream_start_streaming(), which takes it before the buffers are set
+up.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-capture-dvp.c
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-capture-dvp.c
+@@ -781,6 +781,11 @@
+ 			goto out;
+ 		}
+ 
++		if (!stream->streaming) {
++			ret = IRQ_HANDLED;
++			goto out;
++		}
++
+ 		if (lastline != stream->pix.height) {
+ 			v4l2_err(&rkcif->v4l2_dev,
+ 				 "bad frame, irq:%#x frmst:%#x size:%dx%d\n",
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-capture-mipi.c
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-capture-mipi.c
+@@ -837,6 +837,9 @@
+ 					continue;
+ 				}
+ 
++				if (!stream->streaming)
++					continue;
++
+ 				rkcif_stream_pingpong(stream);
+ 			}
+ 		}
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-common.h
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-common.h
+@@ -146,6 +146,13 @@
+ 	const struct rkcif_output_fmt *out_fmts;
+ 	unsigned int out_fmts_num;
+ 
++	/*
++	 * Set while the ping-pong buffers below are valid, i.e. between
++	 * rkcif_stream_init_buffers() and rkcif_stream_return_all_buffers().
++	 * The interrupt handler must not service the stream otherwise.
++	 */
++	bool streaming;
++
+ 	/* in ping-pong mode, two buffers can be provided to the HW */
+ 	struct rkcif_buffer *buffers[2];
+ 	int frame_idx;
+@@ -232,6 +239,7 @@
+ 
+ struct rkcif_device {
+ 	struct device *dev;
++	int irq;
+ 
+ 	const struct rkcif_match_data *match_data;
+ 	struct clk_bulk_data clks[RKCIF_CLK_MAX];
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-dev.c
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-dev.c
+@@ -150,14 +150,33 @@
+ 
+ static irqreturn_t rkcif_isr(int irq, void *ctx)
+ {
++	struct device *dev = ctx;
+ 	irqreturn_t ret = IRQ_NONE;
+ 
++	/*
++	 * The interrupt line is shared and stays requested for the whole
++	 * lifetime of the driver, so this handler also runs for interrupts
++	 * raised by other devices while CIF itself is runtime suspended. In
++	 * that state the CIF clocks are gated and rkcif_runtime_suspend() has
++	 * pulsed the CIF reset, so reading the interrupt status registers
++	 * returns garbage that looks like a frame end for every stream.
++	 * Only touch the hardware while the device is powered, and hold a
++	 * runtime PM reference so that it cannot suspend underneath us. A
++	 * negative return means runtime PM is disabled for the device, in
++	 * which case the power state is unknown and the hardware is equally
++	 * out of bounds.
++	 */
++	if (pm_runtime_get_if_active(dev) <= 0)
++		return IRQ_NONE;
++
+ 	if (rkcif_dvp_isr(irq, ctx) == IRQ_HANDLED)
+ 		ret = IRQ_HANDLED;
+ 
+ 	if (rkcif_mipi_isr(irq, ctx) == IRQ_HANDLED)
+ 		ret = IRQ_HANDLED;
+ 
++	pm_runtime_put(dev);
++
+ 	return ret;
+ }
+ 
+@@ -186,6 +205,7 @@
+ 	if (irq < 0)
+ 		return irq;
+ 
++	rkcif->irq = irq;
+ 	ret = devm_request_irq(dev, irq, rkcif_isr, IRQF_SHARED,
+ 			       dev_driver_string(dev), dev);
+ 	if (ret)
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-stream.c
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-stream.c
+@@ -6,6 +6,7 @@
+  * Copyright (C) 2025 Collabora, Ltd.
+  */
+ 
++#include <linux/interrupt.h>
+ #include <linux/pm_runtime.h>
+ 
+ #include <media/v4l2-common.h>
+@@ -134,6 +135,8 @@
+ 		stream->queue_buffer(stream, 1);
+ 	}
+ 
++	stream->streaming = true;
++
+ 	return 0;
+ 
+ err_dummy_free:
+@@ -150,13 +153,24 @@
+ {
+ 	struct rkcif_buffer *buffer;
+ 
+-	if (stream->buffers[0] && !stream->buffers[0]->is_dummy) {
+-		rkcif_stream_return_buffer(stream->buffers[0], state);
++	/*
++	 * Tell the interrupt handler to leave this stream alone and wait for
++	 * an instance that is already running on another CPU to finish, so
++	 * that the ping-pong buffers cannot be handed to the hardware or
++	 * completed once they have been returned below.
++	 */
++	stream->streaming = false;
++	synchronize_irq(stream->rkcif->irq);
++
++	if (stream->buffers[0]) {
++		if (!stream->buffers[0]->is_dummy)
++			rkcif_stream_return_buffer(stream->buffers[0], state);
+ 		stream->buffers[0] = NULL;
+ 	}
+ 
+-	if (stream->buffers[1] && !stream->buffers[1]->is_dummy) {
+-		rkcif_stream_return_buffer(stream->buffers[1], state);
++	if (stream->buffers[1]) {
++		if (!stream->buffers[1]->is_dummy)
++			rkcif_stream_return_buffer(stream->buffers[1], state);
+ 		stream->buffers[1] = NULL;
+ 	}
+ 
+@@ -319,10 +333,15 @@
+ 	if (!ret && stream->stop_streaming)
+ 		stream->stop_streaming(stream);
+ 
+-	pm_runtime_put(rkcif->dev);
+-
+ 	rkcif_stream_return_all_buffers(stream, VB2_BUF_STATE_ERROR);
+ 
++	/*
++	 * Drop the runtime PM reference only once the stream state is torn
++	 * down: rkcif_runtime_suspend() resets the whole CIF block, which must
++	 * not happen while buffers are still programmed into the hardware.
++	 */
++	pm_runtime_put(rkcif->dev);
++
+ 	video_device_pipeline_stop(&stream->vdev);
+ }
+ 

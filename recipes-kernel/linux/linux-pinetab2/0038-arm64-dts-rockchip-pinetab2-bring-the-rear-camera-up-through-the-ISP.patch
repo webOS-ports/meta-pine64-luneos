@@ -1,0 +1,115 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 20 Sep 2026 09:10:00 +0200
+Subject: [PATCH] arm64: dts: rockchip: pinetab2: bring the rear camera up through the ISP
+
+Describe the rk3568 ISP (isp@fdff0000) and its IOMMU, then on the PineTab 2
+route the rear OV5648 to it over the lower D-PHY lane pair (phy cell 2)
+while the front GC02M2 keeps its VICAP path on the upper pair. The rear
+sensor now has a hardware-processed pipeline; either camera can be
+selected, though the shared D-PHY streams one at a time.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi
+@@ -717,6 +717,41 @@
+ 		status = "disabled";
+ 	};
+ 
++	isp: isp@fdff0000 {
++		compatible = "rockchip,rk3568-cif-isp";
++		reg = <0x0 0xfdff0000 0x0 0x10000>;
++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "isp", "mi", "mipi";
++		clocks = <&cru CLK_ISP>, <&cru ACLK_ISP>, <&cru HCLK_ISP>;
++		clock-names = "isp", "aclk", "hclk";
++		iommus = <&isp_mmu>;
++		power-domains = <&power RK3568_PD_VI>;
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			isp_in: port@0 {
++				reg = <0>;
++			};
++		};
++	};
++
++	isp_mmu: iommu@fdff1a00 {
++		compatible = "rockchip,rk3568-iommu";
++		reg = <0x0 0xfdff1a00 0x0 0x100>;
++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_ISP>, <&cru HCLK_ISP>;
++		clock-names = "aclk", "iface";
++		#iommu-cells = <0>;
++		power-domains = <&power RK3568_PD_VI>;
++		rockchip,disable-mmu-reset;
++		status = "disabled";
++	};
++
+ 	sdmmc2: mmc@fe000000 {
+ 		compatible = "rockchip,rk3568-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x0 0xfe000000 0x0 0x4000>;
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -325,11 +325,16 @@
+ };
+ 
+ /*
+- * The two sensors sit on the two halves of the single CSI-2 D-PHY: the rear
+- * OV5648 on lanes 0-1 with the first clock lane, the front GC02M2 on lane 2
+- * with the second clock lane. Mainline has one CSI-2 receiver with one input,
+- * so only one of them can be wired up at a time; this build brings up the
+- * front camera.
++ * The two sensors sit on the two halves of the single CSI-2 D-PHY, each with
++ * its own receiver: the front GC02M2 on the upper pair (lane 2, second clock
++ * lane) feeds the MIPI CSI-2 host and VICAP, while the rear OV5648 on the lower
++ * pair (lanes 0-1, first clock lane) is routed to the ISP for hardware
++ * processing. The D-PHY driver programs the GRF so each pair reaches its
++ * receiver; the fourth phy cell (2) selects "lower pair to the ISP".
++ *
++ * The two paths cannot stream at the same instant - the shared D-PHY holds one
++ * pairing at a time - but either camera can be selected, which is what the
++ * front/rear switch needs.
+  */
+ &csi {
+ 	phys = <&csi_dphy 1>;
+@@ -347,6 +352,24 @@
+ 	status = "okay";
+ };
+ 
++&isp {
++	status = "okay";
++	phys = <&csi_dphy 2>;
++	phy-names = "dphy";
++};
++
++&isp_mmu {
++	status = "okay";
++};
++
++&isp_in {
++	isp_mipi_in: endpoint {
++		bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
++		data-lanes = <1 2>;
++		remote-endpoint = <&ov5648_out>;
++	};
++};
++
+ &dsi0 {
+ 	status = "okay";
+ 	clock-master;
+@@ -713,6 +736,7 @@
+ 			ov5648_out: endpoint {
+ 				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+ 				data-lanes = <1 2>;
++				remote-endpoint = <&isp_mipi_in>;
+ 				link-frequencies = /bits/ 64 <210000000 168000000>;
+ 			};
+ 		};

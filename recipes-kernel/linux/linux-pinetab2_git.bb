@@ -43,6 +43,23 @@ SRC_URI += " \
     file://0006-arm64-dts-rockchip-pinetab2-use-DanctNIX-wifi-power.patch \
     file://0009-arm64-dts-rockchip-pinetab2-let-the-phy-drive-otg.patch \
     file://0010-arm64-dts-rockchip-pinetab2-limit-otg-to-full-speed.patch \
+    file://0011-arm64-dts-rockchip-pinetab2-connect-the-rear-camera.patch \
+    file://0012-media-i2c-ov5648-add-the-controls-libcamera-requires.patch \
+    file://0013-arm64-dts-rockchip-pinetab2-mux-the-camera-master-clock-and-fix-its-gpios.patch \
+    file://0014-arm64-dts-rockchip-pinetab2-keep-PD_VI-on-while-the-camera-is-powered.patch \
+    file://0015-media-i2c-ov5648-do-not-refuse-analogue-gain-while-agc-reads-enabled.patch \
+    file://0016-media-dw-mipi-csi2rx-always-report-progressive-frames.patch \
+    file://0017-arm64-dts-rockchip-pinetab2-let-the-camera-use-its-internal-avdd-regulator.patch \
+    file://0018-media-rkcif-honour-the-mbus_code-filter-when-enumerating-formats.patch \
+    file://0019-media-i2c-ov5648-keep-cached-control-values-while-powered-down.patch \
+    file://0020-media-i2c-add-a-driver-for-the-GalaxyCore-GC02M2.patch \
+    file://0021-phy-rockchip-inno-csidphy-support-the-rk3568-split-mode-lane-pair.patch \
+    file://0022-arm64-dts-rockchip-pinetab2-describe-the-front-camera.patch \
+    file://0023-media-i2c-ov5648-expose-the-orientation-and-rotation-properties.patch \
+    file://0035-media-rkcif-do-not-service-streams-while-suspended-or-stopped.patch \
+    file://0036-media-rkisp1-add-rk3566-rk3568-support.patch \
+    file://0037-phy-rockchip-inno-csidphy-route-a-split-lane-pair-to-the-ISP.patch \
+    file://0038-arm64-dts-rockchip-pinetab2-bring-the-rear-camera-up-through-the-ISP.patch \
     file://0007-Patch-linux-framebuffer-logo-for-LuneOS.patch \
     file://defconfig \
     file://extra.cfg \
