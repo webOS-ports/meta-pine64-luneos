@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 20 Sep 2026 21:20:00 +0200
+Subject: [PATCH] arm64: dts: rk3399-pinephone-pro: wire the WiFi host-wake
+ interrupt
+
+Without an out-of-band wake line brcmfmac offers no wake-on-WLAN at all,
+so cfg80211 tears the association down on every suspend. On LuneOS that
+costs a full reassociation on each resume and leaves the phone
+unreachable while it sleeps: nothing that arrives over the air can wake
+it, and its own logs show it simply absent from the network for as long
+as it is suspended.
+
+Measured on the phone before this change:
+
+    # iw phy phy0 info | grep -i wowlan     (nothing)
+    # iw phy phy0 wowlan enable magic-packet
+    command failed: Operation not supported (-95)
+    # ls /proc/device-tree/mmc@fe310000/wifi@1
+    compatible  name  pinctrl-0  pinctrl-names  reg
+
+There is no interrupt in the node, which is why the driver advertises
+nothing: on SDIO brcmfmac only exposes WOWL when it has a host-wake
+interrupt to arm.
+
+The line itself is already described. The pinctrl group wifi_host_wake_l
+muxes GPIO4_D0 for exactly this purpose and nothing else in the board
+uses that pin, and the firmware on the device carries the matching
+controls (wowl_gpio, wowl_gpiopol in brcmfmac43456-sdio.bin, fifteen
+wowl variables in the 43455 image). Only the interrupt properties were
+commented out, by 79f9c93f0bcb ("Disable interrupt GPIO for WiFi for the
+Pinephone Pro"), because the OOB interrupt breaks dev-version boards and
+firmware configurations that do not use it.
+
+This board is not one of those: its firmware provides the GPIO wake
+variables. Restore the three properties so the driver can offer
+magic-packet wake, which LuneOS then arms automatically from its udev
+helper.
+
+If a unit does turn out to be an OOB-less one, the symptom is WiFi that
+no longer associates, and the remedy is to drop this patch again.
+
+Upstream-Status: Inappropriate [board-specific; upstream disabled this
+deliberately in 79f9c93f0bcb because it breaks dev-version boards and
+firmware configurations without OOB interrupts]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+--- a/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-pinephone-pro.dts
+@@ -1503,9 +1503,9 @@
+ 	brcmf: wifi@1 {
+ 		compatible = "brcm,bcm4329-fmac";
+ 		reg = <1>;
+-		//interrupt-parent = <&gpio4>;
+-		//interrupts = <RK_PD0 IRQ_TYPE_LEVEL_HIGH>;
+-		//interrupt-names = "host-wake";
++		interrupt-parent = <&gpio4>;
++		interrupts = <RK_PD0 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "host-wake";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&wifi_host_wake_l>;
+ 	};
