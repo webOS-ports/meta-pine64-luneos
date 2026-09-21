@@ -11,7 +11,6 @@ SRC_URI += " \
     file://0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch \
     file://0005-power-rk818_battery-stop-treating-every-boot-as-firs.patch \
     file://0035-arm64-dts-rockchip-pinephone-pro-reserve-memory-for-ramoops.patch \
-    file://0006-dts-pinephone-pro-wire-the-wifi-host-wake-interrupt.patch \
     file://defconfig \
     file://extra.cfg \
 "
