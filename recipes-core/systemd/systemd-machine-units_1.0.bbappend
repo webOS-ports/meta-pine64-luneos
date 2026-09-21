@@ -1,5 +1,11 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
+# The base recipe in oe-core ships no sources at all, so S keeps bitbake.conf's
+# default of ${UNPACKDIR}/${BP} - a directory that never gets created once this
+# append puts loose files in SRC_URI, which is what makes do_unpack warn that S
+# does not exist. The files land straight in ${UNPACKDIR}, so point S there.
+S = "${UNPACKDIR}"
+
 SRC_URI:append:pinetab2 = " \
     file://wifi-module-load.service \
     file://wifi-macaddr-persister.service \
