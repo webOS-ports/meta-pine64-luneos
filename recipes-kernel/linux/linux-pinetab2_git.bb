@@ -40,6 +40,9 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 # Any re-introduction of that approach must also drive pwren and pwrkey, not just
 # reset - otherwise the BES2600 never powers on.
 #
+# Camera bring-up (rear OV5648 + front GC02M2) runs through the libcamera soft-ISP
+# path (VICAP/rkcif). The abandoned HW-ISP experiments and the CPU-OPP/i2c tuning
+# spikes are preserved under linux-pinetab2/wip/ but are deliberately NOT built.
 SRC_URI += " \
     file://0001-media-i2c-ov5648-add-the-controls-libcamera-requires.patch \
     file://0002-media-i2c-ov5648-do-not-refuse-analogue-gain-while-A.patch \
