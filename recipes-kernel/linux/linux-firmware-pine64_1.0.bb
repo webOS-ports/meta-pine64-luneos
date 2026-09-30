@@ -1,5 +1,5 @@
 DESCRIPTION = "Various firmware files for Pine64 PinePhone, PinePhonePro and PineTab2"
-LICENSE = "Proprietary"
+LICENSE = "LicenseRef-Proprietary"
 LIC_FILES_CHKSUM = "file://${UNPACKDIR}/LICENCE.rtlwifi_firmware.txt;md5=00d06cfd3eddd5a2698948ead2ad54a5"
 
 COMPATIBLE_MACHINE = "pinephonepro|pinephone|pinetab2"
