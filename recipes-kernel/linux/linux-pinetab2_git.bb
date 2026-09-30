@@ -61,6 +61,8 @@ SRC_URI += " \
     file://0018-arm64-dts-rk3566-pinetab2-limit-the-OTG-port-to-full.patch \
     file://0019-arm64-dts-rockchip-pinetab2-reserve-memory-for-ramoo.patch \
     file://0024-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://0025-arm64-dts-rockchip-pinetab2-give-Bluetooth-back-its-.patch \
+    file://0026-Bluetooth-degrade-instead-of-failing-on-a-bogus-LE-b.patch \
     file://defconfig \
     file://extra.cfg \
 "
