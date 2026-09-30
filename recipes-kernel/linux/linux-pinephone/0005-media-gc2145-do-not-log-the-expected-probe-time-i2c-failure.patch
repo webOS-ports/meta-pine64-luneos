@@ -1,0 +1,89 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 26 Sep 2026 00:00:00 +0200
+Subject: [PATCH] media: gc2145: do not log the expected probe-time i2c failure
+
+Every boot logs three of these:
+
+  gc2145 3-003c: gc2145_write_regs: error -6: addr=fe, data=00
+
+which looks like the sensor is broken. It is not. The sequence is:
+
+  gc2145_probe -> gc2145_identify -> gc2145_read16(GC2145_REG_CHIP_ID)
+               -> gc2145_switch_bank(0xf0): current_bank is 0xff after
+                  gc2145_power_on, so bank 0 has to be selected first
+               -> gc2145_write_regs(GC2145_REG_RESET /* 0xfe */, 0x00)
+               -> NAK, -ENXIO
+
+and probe already knows this happens - it is what the comment next to the
+identify call describes, "The camera is not reachable this early during boot
+on some boards", and it answers with -EPROBE_DEFER. The three messages are
+three deferred attempts; the fourth succeeds and the camera works.
+
+So the transfer failing is expected here, and only here. Log it at debug
+level while identifying and leave the error path alone everywhere else,
+where a NAK really does mean something went wrong.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/i2c/gc2145.c
++++ b/drivers/media/i2c/gc2145.c
+@@ -486,6 +486,12 @@
+ 	bool flips_grabbed;
+ 	/* a fixed-value test pattern must not be metered, see s_ctrl */
+ 	bool test_pattern_holds_aec;
++	/*
++	 * Probing the chip id is allowed to fail: the sensor is not always
++	 * reachable that early during boot, and probe just defers. Do not
++	 * shout about the i2c transfers it makes while that is expected.
++	 */
++	bool identifying;
+ 
+ 	u8 current_bank;
+ 
+@@ -528,9 +534,14 @@
+ 
+ 	ret = i2c_transfer(client->adapter, &msg, 1);
+ 	if (ret < 0) {
+-		v4l2_err(&sensor->sd,
+-			 "%s: error %d: addr=%x, data=%*ph\n",
+-			 __func__, ret, (u32)addr, data_size, data);
++		if (sensor->identifying)
++			dev_dbg(&client->dev,
++				"%s: error %d: addr=%x, data=%*ph\n",
++				__func__, ret, (u32)addr, data_size, data);
++		else
++			v4l2_err(&sensor->sd,
++				 "%s: error %d: addr=%x, data=%*ph\n",
++				 __func__, ret, (u32)addr, data_size, data);
+ 		return ret;
+ 	}
+ 
+@@ -556,9 +567,13 @@
+ 
+ 	ret = i2c_transfer(client->adapter, msg, 2);
+ 	if (ret < 0) {
+-		v4l2_err(&sensor->sd,
+-			 "%s: error %d: start_index=%x, data_size=%d\n",
+-			 __func__, ret, (u32)addr, data_size);
++		if (sensor->identifying)
++			dev_dbg(&client->dev, "%s: read error %d\n",
++				__func__, ret);
++		else
++			v4l2_err(&sensor->sd,
++				 "%s: error %d: start_index=%x, data_size=%d\n",
++				 __func__, ret, (u32)addr, data_size);
+ 		return ret;
+ 	}
+ 
+@@ -3238,7 +3253,9 @@
+ 	if (ret)
+ 		goto entity_cleanup;
+ 
++	sensor->identifying = true;
+ 	ret = gc2145_identify(sensor);
++	sensor->identifying = false;
+ 	if (ret) {
+ 		/*
+ 		 * The camera is not reachable this early during boot on

@@ -1,0 +1,215 @@
+From 116bed744016906f56ddf9994c0c6a6b39e4fe5d Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 18 Sep 2026 06:00:00 +0200
+Subject: [PATCH 01/26] media: i2c: ov5648: add the controls libcamera requires
+
+libcamera refuses to use this sensor. With the PineTab2's capture chain fully
+connected - ov5648 -> dw-mipi-csi2rx -> rkcif, every media link enabled - it
+still lists no cameras:
+
+    ERROR CameraSensor 'ov5648 2-0036': Mandatory V4L2 control 0x009e0903 not available
+    ERROR CameraSensor 'ov5648 2-0036': Mandatory V4L2 control 0x009e0902 not available
+    ERROR CameraSensor 'ov5648 2-0036': Mandatory V4L2 control 0x009e0901 not available
+    ERROR CameraSensor 'ov5648 2-0036': The sensor kernel driver needs to be fixed
+    ERROR SimplePipeline: No valid pipeline for sensor 'ov5648 2-0036', skipping
+
+Those are V4L2_CID_ANALOGUE_GAIN, V4L2_CID_HBLANK and V4L2_CID_VBLANK, which
+Documentation/driver-api/media/camera-sensor.rst makes mandatory for a camera
+sensor driver. This one predates that and exposes only the legacy user-class
+V4L2_CID_GAIN, with blanking implied by the mode's hts/vts and never published.
+
+Add all three:
+
+- ANALOGUE_GAIN shares the register the existing GAIN control writes, so it
+  reuses ov5648_gain_configure() and disables auto gain the same way. GAIN is
+  left in place so existing users keep working.
+
+- HBLANK is hts - output_size_x. The driver programs HTS from the mode and has
+  no way to vary it, so the control is read-only with min == max, which is what
+  the sensor requirements permit for a fixed value.
+
+- VBLANK is vts - output_size_y and is writable, which is how frame duration is
+  controlled. VTS is now derived from it rather than taken straight from the
+  mode, with the mode's own value as the default so behaviour is unchanged
+  until something sets the control.
+
+Both blanking controls are per mode - the full and binned modes differ in hts
+and vts - so their ranges are updated when the mode changes.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/i2c/ov5648.c | 108 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 103 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/media/i2c/ov5648.c b/drivers/media/i2c/ov5648.c
+index 0643440a6f5d..b8363d799d95 100644
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -241,6 +241,13 @@
+ #define OV5648_HTS_H(v)				(((v) & GENMASK(12, 8)) >> 8)
+ #define OV5648_HTS_L_REG			0x380d
+ #define OV5648_HTS_L(v)				((v) & GENMASK(7, 0))
++/*
++ * Minimum vertical blanking, and the largest frame height the 16-bit VTS
++ * registers can express.
++ */
++#define OV5648_VBLANK_MIN			4
++#define OV5648_VTS_MAX				0xffff
++
+ #define OV5648_VTS_H_REG			0x380e
+ #define OV5648_VTS_H(v)				(((v) & GENMASK(15, 8)) >> 8)
+ #define OV5648_VTS_L_REG			0x380f
+@@ -630,6 +637,10 @@ struct ov5648_ctrls {
+ 
+ 	struct v4l2_ctrl *gain_auto;
+ 	struct v4l2_ctrl *gain;
++	struct v4l2_ctrl *analogue_gain;
++
++	struct v4l2_ctrl *hblank;
++	struct v4l2_ctrl *vblank;
+ 
+ 	struct v4l2_ctrl *white_balance_auto;
+ 	struct v4l2_ctrl *red_balance;
+@@ -1315,6 +1326,35 @@ static int ov5648_mode_pll2_configure(struct ov5648_sensor *sensor,
+ 			    OV5648_PLLS_CTRL_SYS_DIV(config->sys_div));
+ }
+ 
++/*
++ * VBLANK is expressed relative to the mode's output height, and the sensor is
++ * programmed with the resulting total frame height (VTS). Keep the mode's own
++ * vts as the default so nothing changes until a client sets the control.
++ */
++static unsigned int ov5648_mode_vts(struct ov5648_sensor *sensor,
++				    const struct ov5648_mode *mode)
++{
++	struct ov5648_ctrls *ctrls = &sensor->ctrls;
++
++	if (!ctrls->vblank)
++		return mode->vts;
++
++	return mode->output_size_y + ctrls->vblank->val;
++}
++
++static int ov5648_vts_configure(struct ov5648_sensor *sensor,
++				const struct ov5648_mode *mode,
++				unsigned int vts)
++{
++	int ret;
++
++	ret = ov5648_write(sensor, OV5648_VTS_H_REG, OV5648_VTS_H(vts));
++	if (ret)
++		return ret;
++
++	return ov5648_write(sensor, OV5648_VTS_L_REG, OV5648_VTS_L(vts));
++}
++
+ static int ov5648_mode_configure(struct ov5648_sensor *sensor,
+ 				 const struct ov5648_mode *mode, u32 mbus_code)
+ {
+@@ -1428,11 +1468,7 @@ static int ov5648_mode_configure(struct ov5648_sensor *sensor,
+ 
+ 	/* Vertical Total Size */
+ 
+-	ret = ov5648_write(sensor, OV5648_VTS_H_REG, OV5648_VTS_H(mode->vts));
+-	if (ret)
+-		return ret;
+-
+-	ret = ov5648_write(sensor, OV5648_VTS_L_REG, OV5648_VTS_L(mode->vts));
++	ret = ov5648_vts_configure(sensor, mode, ov5648_mode_vts(sensor, mode));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1770,6 +1806,22 @@ static int ov5648_state_configure(struct ov5648_sensor *sensor,
+ 	if (ret)
+ 		return ret;
+ 
++	/*
++	 * Blanking is per mode: hts and vts differ between the full and binned
++	 * modes, so the control ranges have to follow the selected one.
++	 */
++	if (sensor->ctrls.hblank) {
++		unsigned int hblank = mode->hts - mode->output_size_x;
++		unsigned int vblank = mode->vts - mode->output_size_y;
++
++		__v4l2_ctrl_modify_range(sensor->ctrls.hblank, hblank, hblank,
++					 1, hblank);
++		__v4l2_ctrl_modify_range(sensor->ctrls.vblank,
++					 OV5648_VBLANK_MIN,
++					 OV5648_VTS_MAX - mode->output_size_y,
++					 1, vblank);
++	}
++
+ 	sensor->state.mode = mode;
+ 	sensor->state.mbus_code = mbus_code;
+ 
+@@ -2000,6 +2052,20 @@ static int ov5648_s_ctrl(struct v4l2_ctrl *ctrl)
+ 				return ret;
+ 		}
+ 		break;
++	case V4L2_CID_ANALOGUE_GAIN:
++		/*
++		 * Same register as V4L2_CID_GAIN; the analogue gain control is
++		 * what libcamera requires and what it drives.
++		 */
++		ret = ov5648_gain_auto_configure(sensor, false);
++		if (ret)
++			return ret;
++
++		return ov5648_gain_configure(sensor, ctrl->val);
++	case V4L2_CID_VBLANK:
++		return ov5648_vts_configure(sensor, sensor->state.mode,
++					    sensor->state.mode->output_size_y +
++					    ctrl->val);
+ 	case V4L2_CID_AUTO_WHITE_BALANCE:
+ 		enable = !!ctrl->val;
+ 
+@@ -2070,6 +2136,37 @@ static int ov5648_ctrls_init(struct ov5648_sensor *sensor)
+ 
+ 	v4l2_ctrl_auto_cluster(2, &ctrls->gain_auto, 0, true);
+ 
++	/*
++	 * libcamera requires V4L2_CID_ANALOGUE_GAIN rather than the legacy
++	 * V4L2_CID_GAIN, and refuses the sensor outright without it. Both drive
++	 * the same register.
++	 */
++	ctrls->analogue_gain = v4l2_ctrl_new_std(handler, ops,
++						 V4L2_CID_ANALOGUE_GAIN, 16,
++						 1023, 16, 16);
++
++	/* Blanking */
++
++	/*
++	 * Also mandatory for libcamera. HBLANK is fixed per mode here, as the
++	 * driver programs HTS from the mode and exposes no way to vary it.
++	 * VBLANK extends the frame, which is how frame duration is controlled.
++	 */
++	ctrls->hblank = v4l2_ctrl_new_std(handler, ops, V4L2_CID_HBLANK,
++					  ov5648_modes[0].hts -
++					  ov5648_modes[0].output_size_x,
++					  ov5648_modes[0].hts -
++					  ov5648_modes[0].output_size_x, 1,
++					  ov5648_modes[0].hts -
++					  ov5648_modes[0].output_size_x);
++
++	ctrls->vblank = v4l2_ctrl_new_std(handler, ops, V4L2_CID_VBLANK,
++					  OV5648_VBLANK_MIN,
++					  OV5648_VTS_MAX -
++					  ov5648_modes[0].output_size_y, 1,
++					  ov5648_modes[0].vts -
++					  ov5648_modes[0].output_size_y);
++
+ 	/* White Balance */
+ 
+ 	ctrls->white_balance_auto =
+@@ -2118,6 +2215,7 @@ static int ov5648_ctrls_init(struct ov5648_sensor *sensor)
+ 
+ 	ctrls->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
+ 	ctrls->pixel_rate->flags |= V4L2_CTRL_FLAG_READ_ONLY;
++	ctrls->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
+ 
+ 	sensor->subdev.ctrl_handler = handler;
+ 
+-- 
+2.53.0
+

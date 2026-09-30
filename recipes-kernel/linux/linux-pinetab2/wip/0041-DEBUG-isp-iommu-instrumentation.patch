@@ -1,0 +1,147 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 22 Sep 2026 09:00:00 +0200
+Subject: [PATCH] DEBUG: rkisp1/rk_iommu/ov5648/params instrumentation + v2 GFP_DMA32 (TEMP)
+
+Diagnose the rk3568 rear-camera params/stats path. Not for merge.
+
+Upstream-Status: Inappropriate [debug]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-capture.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-capture.c
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include <linux/delay.h>
++#include <linux/iommu.h>
+ #include <linux/pm_runtime.h>
+ #include <media/v4l2-common.h>
+ #include <media/v4l2-event.h>
+@@ -745,6 +746,20 @@
+ 
+ 		buff_addr = cap->buf.next->buff_addr;
+ 
++		{
++			struct iommu_domain *dom =
++				iommu_get_domain_for_dev(cap->rkisp1->dev);
++			phys_addr_t phys = dom ?
++				iommu_iova_to_phys(dom, buff_addr[RKISP1_PLANE_Y]) : 0;
++
++			dev_info(cap->rkisp1->dev,
++				 "DBG %s: dma Y=%pad shift=%u reg=0x%08x dom=%p type=%d iova2phys=%pa\n",
++				 cap->id ? "sp" : "mp",
++				 &buff_addr[RKISP1_PLANE_Y], shift,
++				 (u32)(buff_addr[RKISP1_PLANE_Y] >> shift),
++				 dom, dom ? (int)dom->type : -1, &phys);
++		}
++
+ 		rkisp1_write(cap->rkisp1, cap->config->mi.y_base_ad_init,
+ 			     buff_addr[RKISP1_PLANE_Y] >> shift);
+ 		/*
+@@ -772,6 +787,9 @@
+ 		 * Use the dummy space allocated by dma_alloc_coherent to
+ 		 * throw data if there is no available buffer.
+ 		 */
++		dev_info(cap->rkisp1->dev, "DBG %s: DUMMY dma=%pad shift=%u reg=0x%08x\n",
++			 cap->id ? "sp" : "mp", &cap->buf.dummy.dma_addr, shift,
++			 (u32)(cap->buf.dummy.dma_addr >> shift));
+ 		rkisp1_write(cap->rkisp1, cap->config->mi.y_base_ad_init,
+ 			     cap->buf.dummy.dma_addr >> shift);
+ 		rkisp1_write(cap->rkisp1, cap->config->mi.cb_base_ad_init,
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -633,8 +633,13 @@
+ 			rk_iommu_base_command(iommu->bases[i], RK_MMU_CMD_PAGE_FAULT_DONE);
+ 		}
+ 
+-		if (int_status & RK_MMU_IRQ_BUS_ERROR)
+-			dev_err(iommu->dev, "BUS_ERROR occurred at %pad\n", &iova);
++		if (int_status & RK_MMU_IRQ_BUS_ERROR) {
++			status = rk_iommu_read(iommu->bases[i], RK_MMU_STATUS);
++			dev_err(iommu->dev,
++				"BUS_ERROR occurred at %pad (DBG base%d int_status=%#x status=%#x dte=%#x)\n",
++				&iova, i, int_status, status,
++				rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR));
++		}
+ 
+ 		if (int_status & ~RK_MMU_IRQ_MASK)
+ 			dev_err(iommu->dev, "unexpected int_status: %#08x\n",
+@@ -1367,7 +1372,7 @@
+ 	.mk_dtentries = &rk_mk_dte_v2,
+ 	.mk_ptentries = &rk_mk_pte_v2,
+ 	.dma_bit_mask = DMA_BIT_MASK(40),
+-	.gfp_flags = 0,
++	.gfp_flags = GFP_DMA32, /* DBG: force page tables <4GB to test walk bus-error */
+ };
+ 
+ static const struct of_device_id rk_iommu_dt_ids[] = {
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -1063,11 +1063,21 @@
+ static int ov5648_sw_standby(struct ov5648_sensor *sensor, int standby)
+ {
+ 	u8 value = 0;
++	u8 rb = 0xff, id_h = 0xff, id_l = 0xff;
++	int ret;
+ 
+ 	if (!standby)
+ 		value = OV5648_SW_STANDBY_STREAM_ON;
+ 
+-	return ov5648_write(sensor, OV5648_SW_STANDBY_REG, value);
++	ret = ov5648_write(sensor, OV5648_SW_STANDBY_REG, value);
++	/* DBG: read back stream reg + chip id to confirm i2c + stream state */
++	ov5648_read(sensor, OV5648_SW_STANDBY_REG, &rb);
++	ov5648_read(sensor, OV5648_CHIP_ID_H_REG, &id_h);
++	ov5648_read(sensor, OV5648_CHIP_ID_L_REG, &id_l);
++	dev_info(sensor->dev,
++		 "DBG sw_standby standby=%d wrote=0x%02x rb=0x%02x id=%02x%02x wr_ret=%d\n",
++		 standby, value, rb, id_h, id_l, ret);
++	return ret;
+ }
+ 
+ static int ov5648_chip_id_check(struct ov5648_sensor *sensor)
+@@ -1360,6 +1370,9 @@
+ {
+ 	int ret;
+ 
++	dev_info(sensor->dev, "DBG mode_configure %ux%u mbus=0x%04x\n",
++		 mode->output_size_x, mode->output_size_y, mbus_code);
++
+ 	/* Crop Start X */
+ 
+ 	ret = ov5648_write(sensor, OV5648_CROP_START_X_H_REG,
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c
+@@ -1980,6 +1980,12 @@
+ {
+ 	const struct rkisp1_ext_params_awb_meas_config *awbm = &block->awbm;
+ 
++	dev_info(params->rkisp1->dev,
++		 "DBG awbm block: flags=0x%x wnd %ux%u @%u,%u\n",
++		 awbm->header.flags, awbm->config.awb_wnd.h_size,
++		 awbm->config.awb_wnd.v_size, awbm->config.awb_wnd.h_offs,
++		 awbm->config.awb_wnd.v_offs);
++
+ 	if (awbm->header.flags & RKISP1_EXT_PARAMS_FL_BLOCK_DISABLE) {
+ 		params->ops->awb_meas_enable(params, &awbm->config,
+ 					     false);
+@@ -2344,6 +2350,16 @@
+ 
+ 	cur_buf = list_first_entry_or_null(&params->params,
+ 					   struct rkisp1_params_buffer, queue);
++	{
++		static int dbg_n;
++		if (dbg_n < 8) {
++			dbg_n++;
++			dev_info(rkisp1->dev, "DBG params_isr run: buf=%p fmt=%s\n",
++				 cur_buf,
++				 params->metafmt->dataformat == V4L2_META_FMT_RK_ISP1_PARAMS ?
++				 "FIXED" : "EXT");
++		}
++	}
+ 	if (!cur_buf)
+ 		goto unlock;
+ 
+-- 
+2.43.0

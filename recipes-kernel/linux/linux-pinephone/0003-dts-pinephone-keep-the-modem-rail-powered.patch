@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 26 Sep 2026 07:20:00 +0200
+Subject: [PATCH] dts: pinephone: keep the modem rail powered
+
+0001-dts-pinephone-drop-modem-power-node removed the only consumer of
+reg_vbat_bb. That node carried
+
+    power-supply = <&reg_vbat_bb>;   /* PL7 */
+
+and with it gone nothing claims the rail, so the EG25 never gets its 3.5V:
+
+    /sys/class/regulator: vbat-bb  state=disabled  users=0
+    (vbat-wifi, for contrast, is enabled with 2 users)
+
+eg25-manager cannot cover for it - its board config
+(/usr/share/eg25-manager/pine64,pinephone-1.2.toml) drives GPIOs only
+(dtr/pwrkey/reset/apready/disable/status) and has no regulator entry. So it
+pulses PWRKEY into a modem that has no power, reads STATUS low, and concludes
+
+    STATUS is low, modem already powered
+
+after which it just waits forever:
+
+    Rescheduling upload since modem isn't online yet, in 30s
+
+The modem never enumerates (no 2c7c:0125 on any of usb1..usb4, all four host
+controllers up and idle), so ofono has no device and the UI shows no bars.
+
+Mark the rail always-on. This mirrors what
+0004-dts-pinephone-pro-keep-the-4G-rails-powered.patch already does for the
+PinePhone Pro, which is why the same EG25 works there.
+
+Trade-off: the rail stays up whenever the phone is on, rather than following
+modem power state. Doing it properly means teaching eg25-manager to own the
+regulator - it has no such support today - or reinstating a DT consumer that
+does not also claim the GPIOs eg25-manager needs, which is what 0001 removed the
+node to avoid.
+
+Upstream-Status: Inappropriate [depends on LuneOS dropping the modem-power node]
+---
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinephone.dtsi
+@@ -393,6 +393,7 @@
+ 		regulator-max-microvolt = <3500000>;
+ 		gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
+ 		enable-active-high;
++		regulator-always-on;
+ 	};
+ 
+ 	reg_vbat_wifi: vbat-wifi {

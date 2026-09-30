@@ -1,0 +1,60 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 26 Sep 2026 00:00:00 +0200
+Subject: [PATCH] media: gc2145: do not fail volatile control reads while
+ suspended
+
+gc2145_g_volatile_ctrl() returns -EIO when the sensor is runtime suspended,
+which is its normal state before anything streams. Any client that reads
+controls while enumerating therefore gets an error. libcamera does exactly
+that, on every single start:
+
+  ERROR V4L2 v4l2_device.cpp:272 'gc2145 3-003c':
+        Unable to read control 0x00980911: Input/output error
+
+0x00980911 is V4L2_CID_EXPOSURE. It is volatile because
+
+  v4l2_ctrl_auto_cluster(3, &ctrls->auto_exposure, V4L2_EXPOSURE_MANUAL, true);
+
+marks the cluster's slaves volatile, so reading it lands here even though the
+switch below only handles the cluster masters.
+
+Report success and leave the cached value instead. This is what
+gc2145_s_ctrl() already does for the same condition a hundred lines below -
+
+  if (!pm_runtime_get_if_in_use(&sensor->i2c_client->dev))
+          return 0;
+
+- deferring to the setup done when streaming starts. There is no value to
+read back from a powered-down sensor, and the cached one is the honest
+answer; -EIO says the hardware failed, which it did not.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/i2c/gc2145.c
++++ b/drivers/media/i2c/gc2145.c
+@@ -1492,8 +1492,22 @@
+ 
+ 	/* v4l2_ctrl_lock() locks our own mutex */
+ 
++	/*
++	 * There is nothing to read back while the sensor is suspended, and
++	 * that is the normal state before streaming starts. Keep the cached
++	 * value and report success, the way gc2145_s_ctrl() already defers
++	 * writes until the stream-start handler setup applies them. Failing
++	 * here instead breaks every client that reads controls while
++	 * enumerating - libcamera does, and logs
++	 *
++	 *   'gc2145 3-003c': Unable to read control 0x00980911:
++	 *   Input/output error
++	 *
++	 * for V4L2_CID_EXPOSURE, which is volatile because it is a slave of
++	 * the auto exposure cluster.
++	 */
+ 	if (!pm_runtime_get_if_in_use(dev))
+-		return -EIO;
++		return 0;
+ 
+ 	switch (ctrl->id) {
+ 	case V4L2_CID_EXPOSURE_AUTO:

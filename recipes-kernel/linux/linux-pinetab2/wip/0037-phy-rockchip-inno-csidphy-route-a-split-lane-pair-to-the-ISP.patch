@@ -1,0 +1,338 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 20 Sep 2026 11:00:00 +0200
+Subject: [PATCH] phy: rockchip: inno-csidphy: route a split lane pair to the ISP
+
+On the rk3566/rk3568 the CSI-2 D-PHY can run in split mode, presenting its
+lower lane pair (lanes 0-1, first clock lane) and upper pair (lanes 2-3,
+second clock lane) as two independent sub-PHYs. The GRF then selects which
+receiver - VICAP or the ISP - each pair feeds. The PineTab2 uses this to put
+the front GC02M2 on the upper pair through VICAP and the rear OV5648 on the
+lower pair through the ISP.
+
+Extend #phy-cells so the cell encodes both the pair (bit 0) and the target
+receiver (bit 1: 0 VICAP, 1 ISP), and program the GRF LANE_SEL / CIF_SEL /
+ISP_SEL and per-pair clock and data-lane enables accordingly. Add the lower
+pair's two-lane data enable (VI_CON0 bits 4-5), which split mode needs
+alongside the existing four-lane full-mode enable.
+
+Because two consumers reference the one D-PHY with different cells, the
+routing must not live in a single shared field - the last of_xlate() would
+win and both cameras would use the same pair. Hand out a distinct phy per
+cell, each carrying its own routing in its drvdata, and latch it into the
+shared hardware scratch at power_on. The D-PHY still drives one pairing at a
+time, which is all the front/rear switch needs.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
+@@ -96,6 +96,8 @@
+ 	/* rk3568 split mode: upper lane pair with its own clock lane */
+ 	GRF_DPHY_CSIPHY_CLKLANE1_EN,
+ 	GRF_DPHY_CSIPHY_DATALANE1_EN,
++	/* rk3568 split mode: lower lane pair (two of the four data lanes) */
++	GRF_DPHY_CSIPHY_DATALANE_EN0,
+ 	GRF_DPHY_CSIPHY_LANE_SEL,
+ 	GRF_DPHY_CIF_CSIPHY_SEL,
+ 	GRF_DPHY_ISP_CSIPHY_SEL,
+@@ -133,6 +135,7 @@
+ 	[GRF_DPHY_CSIPHY_CLKLANE_EN] = PHY_REG(RK3568_GRF_VI_CON0, 1, 8),
+ 	[GRF_DPHY_CSIPHY_DATALANE1_EN] = PHY_REG(RK3568_GRF_VI_CON0, 2, 6),
+ 	[GRF_DPHY_CSIPHY_CLKLANE1_EN] = PHY_REG(RK3568_GRF_VI_CON0, 1, 10),
++	[GRF_DPHY_CSIPHY_DATALANE_EN0] = PHY_REG(RK3568_GRF_VI_CON0, 2, 4),
+ 	[GRF_DPHY_CSIPHY_LANE_SEL] = PHY_REG(RK3568_GRF_VI_CON1, 1, 7),
+ 	[GRF_DPHY_CIF_CSIPHY_SEL] = PHY_REG(RK3568_GRF_VI_CON1, 1, 11),
+ 	[GRF_DPHY_ISP_CSIPHY_SEL] = PHY_REG(RK3568_GRF_VI_CON1, 1, 12),
+@@ -170,8 +173,31 @@
+ 	const struct dphy_drv_data *drv_data;
+ 	struct phy_configure_opts_mipi_dphy config;
+ 	u8 hsfreq;
++	/*
++	 * Routing of the pair being powered on. The D-PHY hardware holds one
++	 * pairing at a time, so these are latched from the streaming phy's
++	 * per-cell context (see struct csidphy_stream) at power_on.
++	 */
+ 	/* first physical data lane: 0, or 2 for the split-mode upper pair */
+ 	u8 lane_offset;
++	/* route the active lane pair to the ISP instead of VICAP */
++	bool route_to_isp;
++	/* one phy per device-tree cell (0-3); routing lives in its drvdata */
++	struct phy *phys[4];
++};
++
++/*
++ * Per-consumer phy context. The provider hands out a distinct phy per
++ * device-tree cell so that two consumers (for example the VICAP path on the
++ * upper lane pair and the ISP path on the lower pair) each carry their own
++ * routing, instead of the last of_xlate() clobbering a single shared value.
++ */
++struct csidphy_stream {
++	struct rockchip_inno_csidphy *priv;
++	/* first physical data lane: 0 for the lower pair, 2 for the upper */
++	u8 lane_offset;
++	/* route this pair to the ISP receiver instead of VICAP */
++	bool route_to_isp;
+ };
+ 
+ static inline void write_grf_reg(struct rockchip_inno_csidphy *priv,
+@@ -232,7 +258,8 @@
+ static int rockchip_inno_csidphy_configure(struct phy *phy,
+ 					   union phy_configure_opts *opts)
+ {
+-	struct rockchip_inno_csidphy *priv = phy_get_drvdata(phy);
++	struct csidphy_stream *stream = phy_get_drvdata(phy);
++	struct rockchip_inno_csidphy *priv = stream->priv;
+ 	const struct dphy_drv_data *drv_data = priv->drv_data;
+ 	struct phy_configure_opts_mipi_dphy *config = &opts->mipi_dphy;
+ 	unsigned int hsfreq = 0;
+@@ -265,12 +292,21 @@
+ 
+ static int rockchip_inno_csidphy_power_on(struct phy *phy)
+ {
+-	struct rockchip_inno_csidphy *priv = phy_get_drvdata(phy);
++	struct csidphy_stream *stream = phy_get_drvdata(phy);
++	struct rockchip_inno_csidphy *priv = stream->priv;
+ 	const struct dphy_drv_data *drv_data = priv->drv_data;
+ 	u64 data_rate_mbps = HZ_TO_MHZ(priv->config.hs_clk_rate);
+ 	u32 val;
+ 	int ret, i;
+ 
++	/*
++	 * Latch this consumer's routing. Only one lane pair streams at a
++	 * time, so writing the shared scratch here is safe and makes the GRF
++	 * programming below reflect the pair that is actually powering on.
++	 */
++	priv->lane_offset = stream->lane_offset;
++	priv->route_to_isp = stream->route_to_isp;
++
+ 	ret = clk_enable(priv->pclk);
+ 	if (ret < 0)
+ 		return ret;
+@@ -301,11 +337,16 @@
+ 	usleep_range(500, 1000);
+ 
+ 	/*
+-	 * Reset dphy digital part. The upper lane pair only receives with
+-	 * the PHY in dual (split) mode; the bit is latched by this reset.
++	 * Reset dphy digital part. The PHY must come out of this reset in dual
++	 * (split) mode whenever the GRF split routing (the SEL bits below) is
++	 * used - that is, for the upper pair (VICAP) OR the lower pair routed to
++	 * the ISP. Confirmed on hardware: routing the lower pair to the ISP
++	 * needs split mode (LANE_SEL 1 + ISP_SEL) - then the ISP CSI2RX receives
++	 * frames (ERR_STAT MIPI_DROP_FRM asserts); full mode (LANE_SEL 0) sends
++	 * the lower pair to VICAP instead and the ISP CSI2RX gets nothing.
+ 	 */
+ 	val = CSIDPHY_CTRL_DIG_RST_UNDEFINED;
+-	if (priv->lane_offset)
++	if (priv->lane_offset || priv->route_to_isp)
+ 		val |= CSIDPHY_CTRL_DIG_RST_DUAL_MODE;
+ 	writel(val, priv->phy_base + CSIDPHY_CTRL_DIG_RST);
+ 	writel(val | CSIDPHY_CTRL_DIG_RST_RESET,
+@@ -333,22 +374,70 @@
+ 		rockchip_inno_csidphy_ths_settle(priv, priv->hsfreq,
+ 				CSIDPHY_LANE_THS_SETTLE(priv->lane_offset + i));
+ 
+-	if (priv->lane_offset) {
+-		/*
+-		 * Split mode, upper pair: lanes 2 and 3 clocked from the
+-		 * second clock lane, routed to the CIF (VICAP) receiver.
+-		 */
++	/*
++	 * rk3568: program the receive clock-lane phase. The vendor csi2-dphy
++	 * driver clears the phase field (bits 6:4) of the clock-lane phase
++	 * register - 0x38 for the lower/first clock lane, 0xcc for the
++	 * upper/second - selecting its default phase 0. This driver never
++	 * touched it, leaving the clock lane at an incorrect power-on phase so
++	 * the D-PHY did not lock and the CSI2RX received no lines. Do it for the
++	 * split-capable SoCs (rk3568) only.
++	 */
++	if (drv_data->grf_regs[GRF_DPHY_CSIPHY_DATALANE1_EN].valid) {
++		u32 phase_off = priv->lane_offset ? 0xcc : 0x38;
++		u32 phase = readl(priv->phy_base + phase_off);
++
++		phase &= ~0x70;
++		writel(phase, priv->phy_base + phase_off);
++	}
++
++	/*
++	 * rk3568 continuous-clock mode: our DT has no clock-noncontinuous
++	 * property so the OV5648 runs the MIPI clock lane continuously. The
++	 * vendor csi2-dphy sets the clock-lane CONTINUE_MODE field (0x128 bits
++	 * 5:4) for continuous-clock sensors; inno-csidphy left it clear, a
++	 * mismatch that shows as persistent SOT sync errors and stops the
++	 * receiver asserting frame sync to the ISP though packets decode.
++	 * Scope to the rear->ISP path so the front camera (VICAP) is untouched.
++	 */
++	if (priv->route_to_isp)
++		writel(readl(priv->phy_base + 0x128) | 0x30,
++		       priv->phy_base + 0x128);
++
++	/*
++	 * Route the lanes to their receiver through the GRF. The SEL bits pick
++	 * which sub-PHY each receiver reads; routing a pair to the ISP needs
++	 * split mode (LANE_SEL 1) with ISP_SEL pointing at that pair. Confirmed
++	 * on hardware: only in split mode does the ISP CSI2RX receive the lower
++	 * pair (ERR_STAT MIPI_DROP_FRM asserts); full mode routes it to VICAP.
++	 *
++	 *   lower -> VICAP : full mode, LANE_SEL 0 (legacy single-camera path)
++	 *   lower -> ISP   : split mode, ISP_SEL lower (0), CIF_SEL upper (1)
++	 *   upper -> VICAP : split mode, CIF_SEL upper (1), ISP_SEL lower (0)
++	 *   upper -> ISP   : split mode, ISP_SEL upper (1), CIF_SEL lower (0)
++	 */
++	if (priv->lane_offset == 0 && !priv->route_to_isp) {
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_LANE_SEL, 0x0);
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_CLKLANE_EN, 0x1);
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_DATALANE_EN,
++			      GENMASK(priv->config.lanes - 1, 0));
++	} else if (priv->lane_offset == 0) {
++		/* lower pair, split, routed to the ISP */
+ 		write_grf_reg(priv, GRF_DPHY_CSIPHY_LANE_SEL, 0x1);
+-		write_grf_reg(priv, GRF_DPHY_CIF_CSIPHY_SEL, 0x1);
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_CLKLANE_EN, 0x1);
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_DATALANE_EN0,
++			      GENMASK(priv->config.lanes - 1, 0));
+ 		write_grf_reg(priv, GRF_DPHY_ISP_CSIPHY_SEL, 0x0);
++		write_grf_reg(priv, GRF_DPHY_CIF_CSIPHY_SEL, 0x1);
++	} else {
++		write_grf_reg(priv, GRF_DPHY_CSIPHY_LANE_SEL, 0x1);
+ 		write_grf_reg(priv, GRF_DPHY_CSIPHY_CLKLANE1_EN, 0x1);
+ 		write_grf_reg(priv, GRF_DPHY_CSIPHY_DATALANE1_EN,
+ 			      GENMASK(priv->config.lanes - 1, 0));
+-	} else {
+-		write_grf_reg(priv, GRF_DPHY_CSIPHY_LANE_SEL, 0x0);
+-		write_grf_reg(priv, GRF_DPHY_CSIPHY_CLKLANE_EN, 0x1);
+-		write_grf_reg(priv, GRF_DPHY_CSIPHY_DATALANE_EN,
+-			      GENMASK(priv->config.lanes - 1, 0));
++		write_grf_reg(priv, GRF_DPHY_ISP_CSIPHY_SEL,
++			      priv->route_to_isp ? 0x1 : 0x0);
++		write_grf_reg(priv, GRF_DPHY_CIF_CSIPHY_SEL,
++			      priv->route_to_isp ? 0x0 : 0x1);
+ 	}
+ 
+ 	return 0;
+@@ -356,7 +432,8 @@
+ 
+ static int rockchip_inno_csidphy_power_off(struct phy *phy)
+ {
+-	struct rockchip_inno_csidphy *priv = phy_get_drvdata(phy);
++	struct csidphy_stream *stream = phy_get_drvdata(phy);
++	struct rockchip_inno_csidphy *priv = stream->priv;
+ 	const struct dphy_drv_data *drv_data = priv->drv_data;
+ 
+ 	/* disable all lanes */
+@@ -379,14 +456,16 @@
+ 
+ static int rockchip_inno_csidphy_init(struct phy *phy)
+ {
+-	struct rockchip_inno_csidphy *priv = phy_get_drvdata(phy);
++	struct csidphy_stream *stream = phy_get_drvdata(phy);
++	struct rockchip_inno_csidphy *priv = stream->priv;
+ 
+ 	return clk_prepare(priv->pclk);
+ }
+ 
+ static int rockchip_inno_csidphy_exit(struct phy *phy)
+ {
+-	struct rockchip_inno_csidphy *priv = phy_get_drvdata(phy);
++	struct csidphy_stream *stream = phy_get_drvdata(phy);
++	struct rockchip_inno_csidphy *priv = stream->priv;
+ 
+ 	clk_unprepare(priv->pclk);
+ 
+@@ -394,30 +473,56 @@
+ }
+ 
+ /*
+- * With #phy-cells = <1>, the cell selects the physical lane pair: 0 for
+- * lanes 0-1 (or all four in full mode), 1 for lanes 2-3 with the second
+- * clock lane. Only SoCs whose GRF describes the split mode accept 1.
++ * With #phy-cells = <1>, the cell encodes the routing of a lane pair:
++ *   bit 0  lane pair: 0 = lanes 0-1 (or all four in full mode),
++ *                     1 = lanes 2-3 with the second clock lane (split mode)
++ *   bit 1  receiver: 0 = VICAP, 1 = the ISP
++ * so cell 0 is the plain lower pair, 1 the upper pair to VICAP, 2 the lower
++ * pair to the ISP and 3 the upper pair to the ISP. Anything but a plain lower
++ * pair needs the GRF to describe the split routing.
++ *
++ * Each cell gets its own phy so that two consumers keep independent routing;
++ * the D-PHY still drives one pairing at a time, latched at power_on.
+  */
++static const struct phy_ops rockchip_inno_csidphy_ops;
++
+ static struct phy *rockchip_inno_csidphy_xlate(struct device *dev,
+ 					       const struct of_phandle_args *args)
+ {
+ 	struct rockchip_inno_csidphy *priv = dev_get_drvdata(dev);
+-	struct phy *phy = of_phy_simple_xlate(dev, args);
+-	u32 pair = args->args_count ? args->args[0] : 0;
+-
+-	if (IS_ERR(phy))
+-		return phy;
++	u32 cell = args->args_count ? args->args[0] : 0;
++	bool upper = cell & 1;
++	bool to_isp = cell & 2;
++	struct csidphy_stream *stream;
++	struct phy *phy;
+ 
+-	if (pair > 1)
++	if (cell >= ARRAY_SIZE(priv->phys))
+ 		return ERR_PTR(-EINVAL);
+ 
+-	if (pair &&
++	if ((upper || to_isp) &&
+ 	    !priv->drv_data->grf_regs[GRF_DPHY_CSIPHY_DATALANE1_EN].valid) {
+-		dev_err(dev, "split mode is not supported on this SoC\n");
++		dev_err(dev, "split/ISP routing is not supported on this SoC\n");
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
+-	priv->lane_offset = pair ? 2 : 0;
++	/* One phy per cell, created on first reference. */
++	if (priv->phys[cell])
++		return priv->phys[cell];
++
++	phy = devm_phy_create(dev, NULL, &rockchip_inno_csidphy_ops);
++	if (IS_ERR(phy))
++		return phy;
++
++	stream = devm_kzalloc(dev, sizeof(*stream), GFP_KERNEL);
++	if (!stream)
++		return ERR_PTR(-ENOMEM);
++
++	stream->priv = priv;
++	stream->lane_offset = upper ? 2 : 0;
++	stream->route_to_isp = to_isp;
++	phy_set_drvdata(phy, stream);
++
++	priv->phys[cell] = phy;
+ 
+ 	return phy;
+ }
+@@ -520,7 +625,6 @@
+ 	struct rockchip_inno_csidphy *priv;
+ 	struct device *dev = &pdev->dev;
+ 	struct phy_provider *phy_provider;
+-	struct phy *phy;
+ 	int ret;
+ 
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+@@ -567,14 +671,7 @@
+ 		return ret;
+ 	}
+ 
+-	phy = devm_phy_create(dev, NULL, &rockchip_inno_csidphy_ops);
+-	if (IS_ERR(phy)) {
+-		dev_err(dev, "failed to create phy\n");
+-		return PTR_ERR(phy);
+-	}
+-
+-	phy_set_drvdata(phy, priv);
+-
++	/* phys are created per device-tree cell in the of_xlate callback. */
+ 	phy_provider = devm_of_phy_provider_register(dev,
+ 						     rockchip_inno_csidphy_xlate);
+ 	if (IS_ERR(phy_provider)) {
+-- 
+2.43.0

@@ -1,0 +1,52 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Wed, 24 Sep 2026 13:30:00 +0200
+Subject: [PATCH] media: rkisp1: keep the ISP config latched every frame on
+ rk3568 (V21)
+
+On the rk3568 (V21) the ISP is fed online from its internal CSI2RX host.
+Mainline activates the ISP with a one-shot ISP_CFG_UPD and then relies on an
+explicit CFG_UPD issued once per frame (from the params ISR) to re-latch the
+shadow registers so the ISP acquires the next frame.
+
+On V21 that per-frame update does not re-arm the CSI2RX->ISP acquisition: the
+ISP processes the first few frames and then stalls. Measured on the PineTab 2
+rear OV5648: the CSI2RX keeps receiving (its per-frame luma stat Y_STAT_RO
+changes every frame and VC0_FRAME_NUM_RO climbs), but CSI2RX ISP_LINECNT_RO
+stays 0, the ISP frame IRQ freezes, and every captured frame is black.
+
+The Rockchip BSP handles this in rkisp_isp_start() with the comment
+"isp20 and isp21 csi2rx need isp force": it sets ISP_CFG_UPD_PERMANENT so the
+ISP latches its shadow registers automatically on every frame instead of
+needing an explicit per-frame CFG_UPD. Do the same on V21.
+
+Upstream-Status: Inappropriate
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
+@@ -450,7 +450,19 @@
+ 	val = rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL);
+ 	val |= RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD |
+ 	       RKISP1_CIF_ISP_CTRL_ISP_ENABLE |
+ 	       RKISP1_CIF_ISP_CTRL_ISP_INFORM_ENABLE;
++	/*
++	 * On the rk3568 (V21) the ISP receives online from the internal CSI2RX.
++	 * A one-shot CFG_UPD plus the per-frame CFG_UPD mainline issues from the
++	 * params ISR does not re-arm the CSI2RX->ISP acquisition here: the ISP
++	 * runs the first frames then stalls (frame IRQ freezes, CSI2RX still
++	 * receives but ISP_LINECNT_RO stays 0, output is black). The Rockchip
++	 * BSP (rkisp_isp_start(), "isp20 and isp21 csi2rx need isp force") sets
++	 * CFG_UPD_PERMANENT so the ISP latches its shadow registers on every
++	 * frame automatically. Do the same on V21.
++	 */
++	if (rkisp1->info->isp_ver == RKISP1_V21)
++		val |= RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD_PERMANENT;
+ 	rkisp1_write(rkisp1, RKISP1_CIF_ISP_CTRL, val);
+ 
+ 	src_fmt = v4l2_subdev_state_get_format(sd_state,
+-- 
+2.43.0

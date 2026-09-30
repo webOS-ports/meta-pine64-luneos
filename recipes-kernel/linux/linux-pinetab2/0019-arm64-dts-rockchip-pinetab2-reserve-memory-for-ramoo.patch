@@ -1,0 +1,47 @@
+From 5675342a3e477e1f5257e56f601b07dd97e6530b Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 18:53:41 +0200
+Subject: [PATCH 19/26] arm64: dts: rockchip: pinetab2: reserve memory for
+ ramoops
+
+The tablet has no reachable serial console, and with panic_on_oops and an
+immediate panic reboot a kernel oops leaves no trace at all - the device
+simply restarts. Reserve the region the Rockchip BSP uses for ramoops
+(0x110000-0x1f0000, between the SCMI shared memory and the kernel) so
+pstore can keep the oops and console output across the reboot.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+index 3ab19bf0537d..eb7413d4cb0a 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -106,6 +106,20 @@ led-0 {
+ 		function = LED_FUNCTION_FLASH;
+ 	};
+ 
++	reserved-memory {
++		/*
++		 * Same window the Rockchip BSP uses: after the SCMI shared
++		 * memory, before the kernel load address.
++		 */
++		ramoops@110000 {
++			compatible = "ramoops";
++			reg = <0x0 0x00110000 0x0 0x000e0000>;
++			record-size = <0x20000>;
++			console-size = <0x80000>;
++			pmsg-size = <0x20000>;
++		};
++	};
++
+ 	rk817-sound {
+ 		compatible = "simple-audio-card";
+ 		pinctrl-names = "default";
+-- 
+2.53.0
+

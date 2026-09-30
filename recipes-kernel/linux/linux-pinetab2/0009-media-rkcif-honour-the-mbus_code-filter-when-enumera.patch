@@ -1,0 +1,75 @@
+From 2de2e3802f4f87e064809bee377202e6e4adc648 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 18 Sep 2026 00:00:00 +0200
+Subject: [PATCH 09/26] media: rkcif: honour the mbus_code filter when
+ enumerating formats
+
+rkcif_stream_enum_formats() returns every entry of out_fmts[] regardless of
+the v4l2_fmtdesc mbus_code the caller asked about, so userspace is told that
+an 8-bit Bayer input can be captured as, among other things, 10-bit Bayer.
+
+libcamera's simple pipeline handler builds its format map by enumerating the
+video node once per sensor media bus code and believes the answer, so it ends
+up pairing SBGGR8_1X8 on the subdev links with SGRBG10 on the video node:
+
+  Picked 1920x1080-SBGGR8_1X8/Unset -> 1920x1080-SGRBG10
+  Link 'ov5648 2-0036'[0] -> 'dw-mipi-csi2rx fdfb0000.csi'[0]:
+        configured with format 1920x1080-SBGGR8_1X8/RAW
+
+VICAP then expects 3840 bytes per line while the receiver delivers 1920, no
+frame ever completes and capture hangs with the buffers queued and no error
+reported anywhere. Reproduced by hand: 8-bit links with a 10-bit video format
+yield nothing in 20 seconds, while the same links with BA81 give three frames
+in two.
+
+The format table already carries the matching mbus_code for every entry, so
+just skip the ones that do not match.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../platform/rockchip/rkcif/rkcif-stream.c    | 25 +++++++++++++++----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/media/platform/rockchip/rkcif/rkcif-stream.c b/drivers/media/platform/rockchip/rkcif/rkcif-stream.c
+index 3130d420ad55..8716b5bb3875 100644
+--- a/drivers/media/platform/rockchip/rkcif/rkcif-stream.c
++++ b/drivers/media/platform/rockchip/rkcif/rkcif-stream.c
+@@ -395,13 +395,28 @@ static int rkcif_stream_enum_formats(struct file *file, void *priv,
+ 				     struct v4l2_fmtdesc *f)
+ {
+ 	struct rkcif_stream *stream = video_drvdata(file);
++	unsigned int found = 0;
++	unsigned int i;
+ 
+-	if (f->index >= stream->out_fmts_num)
+-		return -EINVAL;
+-
+-	f->pixelformat = stream->out_fmts[f->index].fourcc;
++	for (i = 0; i < stream->out_fmts_num; i++) {
++		const struct rkcif_output_fmt *fmt = &stream->out_fmts[i];
++
++		/*
++		 * VICAP writes what the CSI-2 receiver hands it straight to
++		 * memory, so only the formats matching the media bus code are
++		 * usable. Honour the filter rather than advertising all of
++		 * them for every input.
++		 */
++		if (f->mbus_code && fmt->mbus_code != f->mbus_code)
++			continue;
++
++		if (found++ == f->index) {
++			f->pixelformat = fmt->fourcc;
++			return 0;
++		}
++	}
+ 
+-	return 0;
++	return -EINVAL;
+ }
+ 
+ static int rkcif_stream_enum_framesizes(struct file *file, void *fh,
+-- 
+2.53.0
+

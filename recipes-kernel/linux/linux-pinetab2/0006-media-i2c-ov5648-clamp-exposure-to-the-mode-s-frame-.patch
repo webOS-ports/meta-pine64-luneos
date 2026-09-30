@@ -1,0 +1,51 @@
+From c318b7356bfa331c893efc655bc913398405decb Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 18:00:04 +0200
+Subject: [PATCH 06/26] media: i2c: ov5648: clamp exposure to the mode's frame
+ length
+
+The V4L2_CID_EXPOSURE range advertised the raw 20-bit register maximum
+(1048575). A userspace AGC (e.g. libcamera's software ISP) takes that as the
+real exposure ceiling and keeps increasing exposure towards it, never crossing
+over to analogue gain, so a dim scene never gets bright. The sensor can in fact
+integrate at most VTS - 4 lines per frame.
+
+Clamp the exposure control range to the selected mode's frame length when the
+mode is configured (the register counts in 1/16-line steps).
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/i2c/ov5648.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/media/i2c/ov5648.c b/drivers/media/i2c/ov5648.c
+index 4cf62e593bb2..5e37454b0919 100644
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -1828,6 +1828,22 @@ static int ov5648_state_configure(struct ov5648_sensor *sensor,
+ 					 1, vblank);
+ 	}
+ 
++	/*
++	 * Exposure is bounded by the frame length: at most VTS - 4 lines can be
++	 * integrated, and the register counts in 1/16-line steps. The probe-time
++	 * range advertises the 20-bit register maximum (1048575), which a
++	 * userspace AGC (e.g. libcamera's software ISP) takes as the real ceiling
++	 * and then ramps exposure towards forever, never switching to analogue
++	 * gain - so a dim scene stays dark. Clamp the range to the selected
++	 * mode's frame height instead.
++	 */
++	if (sensor->ctrls.exposure) {
++		unsigned int exp_max = (mode->vts - OV5648_VBLANK_MIN) * 16;
++
++		__v4l2_ctrl_modify_range(sensor->ctrls.exposure, 16, exp_max, 16,
++					 min_t(unsigned int, 512, exp_max));
++	}
++
+ 	sensor->state.mode = mode;
+ 	sensor->state.mbus_code = mbus_code;
+ 
+-- 
+2.53.0
+

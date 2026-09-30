@@ -40,15 +40,6 @@ SRCREV_ov5640cam = "61beaa4eb1ad87ad067cfbe123fbcd0a0cf01246"
 # the URL keeps meaning the same bytes.
 SRCREV_rtl8723bt = "d90fa8a98cec71011c87c847f23a38ee75f85f20"
 
-# rtw88 firmware for the RTL8723CS (the wifi half is an RTL8703B). The kernel here
-# is built with CONFIG_RTW88_8723CS=m (see linux-pinephone/extra.cfg), and rtw88
-# loads rtw88/rtw8703b_fw.bin - a different file in a different directory from the
-# rtlwifi/rtl8723bs_*.bin the old staging driver used. Without it the modules probe
-# and then fail the firmware request, so there is no wlan0 at all.
-# SRCREV_kernel above predates these blobs, hence a separate revision; both files
-# are byte-identical at this commit and at linux-firmware HEAD.
-SRCREV_rtw8703b = "a030a6d4cabb5f7f72e3670c219c9364aa400431"
-
 SRCREV_FORMAT = "wifinonfree_bes2600_ov5640cam"
 
 # gitlab.manjaro.org resolves IPv6-only and is currently unreachable from here
@@ -67,8 +58,6 @@ SRC_URI = " \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rockchip/dptx.bin?id=${SRCREV_kernel};downloadfilename=dptx.bin;name=dptx \
     https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_fw.bin;downloadfilename=rtl8723cs_xx_fw.bin;name=rtl8723cs_xx_fw \
     https://raw.githubusercontent.com/maemo-leste/linux-firmware-pine64-rtl8723-bt/${SRCREV_rtl8723bt}/rtl_bt/rtl8723cs_xx_config.bin;downloadfilename=rtl8723cs_xx_config.bin;name=rtl8723cs_xx_config \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtw88/rtw8703b_fw.bin?id=${SRCREV_rtw8703b};downloadfilename=rtw8703b_fw.bin;name=rtw8703b_fw \
-    https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtw88/rtw8703b_wow_fw.bin?id=${SRCREV_rtw8703b};downloadfilename=rtw8703b_wow_fw.bin;name=rtw8703b_wow_fw \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.rtlwifi_firmware.txt?id=${SRCREV_kernel};downloadfilename=LICENCE.rtlwifi_firmware.txt;name=LICENSE_rtlwifi \
     https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/LICENCE.mediatek?id=${SRCREV_kernel};downloadfilename=LICENCE.mediatek;name=LICENSE_mediatek \
     git://gitlab.com/pine64-org/bes2600-firmware.git;branch=main;protocol=https;name=bes2600;destsuffix=${BB_GIT_DEFAULT_DESTSUFFIX}/bes2600 \
@@ -82,8 +71,6 @@ SRC_URI[rtl8723bs_nic.sha256sum] = "a52b5a7be4841b4b2839eddf5122b3300a3610866abe
 SRC_URI[rtl8723bs_bt.sha256sum] = "774f6628ae2cd7d6d8563cbf88f67f9a95e895cb44b55fb26ffdf895fdf26aea"
 SRC_URI[rtl8723cs_xx_fw.sha256sum] = "c68091565d90c29735bedf72d0bf6590c186ab802ef4fef4caa66ef5af25b870"
 SRC_URI[rtl8723cs_xx_config.sha256sum] = "492531d5a0a44ed5d0e174476543735eafe2cacc5ff5ce9e8e10092d303b563c"
-SRC_URI[rtw8703b_fw.sha256sum] = "5e32bd891c74a0719c871726b74490cf5e1a05cdcefb8fe2414f80fffdeb9f9d"
-SRC_URI[rtw8703b_wow_fw.sha256sum] = "7156b0d2b4580e63d11a3a78258c35ff28e840c7c6428953920ae6a1cd5d05ac"
 SRC_URI[ov5640_af.sha256sum] = "439245623bc99f3b0d8c44d47baed3cc17cad01b9191509c89bb8d92a98949c9"
 SRC_URI[mt7610u.sha256sum] = "5a4268e9021bb587426ba624b425f1e660bfc82cd63b36ad3ce6fb9ce6751760"
 SRC_URI[dptx.sha256sum] = "203c5f061fb5075e4ca5398f8becc74e7cc450b494af857da5400788a7eae20b"
@@ -105,12 +92,6 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_fw.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_fw.bin
     install -m 0644 ${UNPACKDIR}/rtl8723cs_xx_config.bin ${D}${nonarch_base_libdir}/firmware/rtl_bt/rtl8723cs_xx_config.bin
     install -m 0644 ${S}/ov5640cam/ov5640_af.bin ${D}${nonarch_base_libdir}/firmware/ov5640_af.bin
-}
-
-do_install:append:pinephone() {
-    install -d ${D}${nonarch_base_libdir}/firmware/rtw88/
-    install -m 0644 ${UNPACKDIR}/rtw8703b_fw.bin ${D}${nonarch_base_libdir}/firmware/rtw88/rtw8703b_fw.bin
-    install -m 0644 ${UNPACKDIR}/rtw8703b_wow_fw.bin ${D}${nonarch_base_libdir}/firmware/rtw88/rtw8703b_wow_fw.bin
 }
 
 do_install:append:pinephonepro() {

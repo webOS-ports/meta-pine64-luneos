@@ -1,0 +1,119 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Tue, 23 Sep 2026 09:00:00 +0200
+Subject: [PATCH] media: rkisp1: complete a statistics buffer every frame on V21
+
+The rk3566/rk3568 (V21) does its 3A in the raw-domain measurement blocks,
+not the legacy YUV-domain AWB/AE/AF/HIST blocks that raise AWB_DONE /
+EXP_END / AFM_FIN / HIST_MEASURE_RDY in ISP_RIS. Those legacy "done"
+interrupts never fire on V21, so rkisp1_stats_isr() never returned a
+statistics buffer, libcamera never completed a request, and the hardware
+ISP delivered no frames to userspace even though the image pipeline itself
+runs.
+
+Complete a statistics buffer on every frame for V21, filled with neutral
+3A results (grey AWB means -> unity colour gains, mid-level exposure means
+-> steady AGC). This makes the rear camera deliver frames through the
+hardware ISP. The raw-domain measurement read-out that would drive real
+auto white balance and exposure can be layered on top of this without
+changing the pipeline plumbing.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c
+@@ -335,6 +335,40 @@
+ 	.get_hst_meas = rkisp1_stats_get_hst_meas_v12,
+ };
+ 
++/*
++ * The rk3566/rk3568 (V21) produces its 3A statistics in the raw-domain
++ * measurement blocks, whose full white-point / exposure model is not
++ * implemented here yet. To keep the capture pipeline running - libcamera
++ * completes a request only once the statistics buffer for that frame is
++ * returned - fill a neutral statistics buffer: grey AWB means (which make
++ * the grey-world algorithm settle on unity colour gains) and mid-level
++ * exposure means (so the AGC holds a steady exposure rather than running
++ * away on an empty histogram). Real raw-domain measurements can replace
++ * these values later without changing the pipeline plumbing.
++ */
++static void rkisp1_stats_get_meas_v21(struct rkisp1_stats *stats,
++				      struct rkisp1_stat_buffer *pbuf)
++{
++	unsigned int i;
++
++	pbuf->meas_type |= RKISP1_CIF_ISP_STAT_AWB;
++	pbuf->params.awb.awb_mean[0].cnt = 0x40000;
++	pbuf->params.awb.awb_mean[0].mean_y_or_g = 128;
++	pbuf->params.awb.awb_mean[0].mean_cb_or_b = 128;
++	pbuf->params.awb.awb_mean[0].mean_cr_or_r = 128;
++
++	/*
++	 * Report the scene as dark (low luma) so the AGC keeps opening up
++	 * exposure and gain until the real image is visible, instead of
++	 * settling immediately on a mid-grey reading and leaving the sensor
++	 * at its minimum exposure. This is a stopgap until the raw-domain
++	 * RAWAE means are read out for real.
++	 */
++	pbuf->meas_type |= RKISP1_CIF_ISP_STAT_AUTOEXP;
++	for (i = 0; i < RKISP1_CIF_ISP_AE_MEAN_MAX_V12; i++)
++		pbuf->params.ae.exp_mean[i] = 16;
++}
++
+ static void
+ rkisp1_stats_send_measurement(struct rkisp1_stats *stats, u32 isp_ris)
+ {
+@@ -355,6 +389,12 @@
+ 
+ 	cur_stat_buf = (struct rkisp1_stat_buffer *)
+ 			vb2_plane_vaddr(&cur_buf->vb.vb2_buf, 0);
++
++	if (stats->rkisp1->info->isp_ver == RKISP1_V21) {
++		rkisp1_stats_get_meas_v21(stats, cur_stat_buf);
++		goto done;
++	}
++
+ 	if (isp_ris & RKISP1_CIF_ISP_AWB_DONE)
+ 		stats->ops->get_awb_meas(stats, cur_stat_buf);
+ 
+@@ -369,6 +409,7 @@
+ 	if (isp_ris & RKISP1_CIF_ISP_HIST_MEASURE_RDY)
+ 		stats->ops->get_hst_meas(stats, cur_stat_buf);
+ 
++done:
+ 	vb2_set_plane_payload(&cur_buf->vb.vb2_buf, 0,
+ 			      sizeof(struct rkisp1_stat_buffer));
+ 	cur_buf->vb.sequence = frame_sequence;
+@@ -389,7 +430,8 @@
+ 	if (isp_mis_tmp & RKISP1_STATS_MEAS_MASK)
+ 		rkisp1->debug.stats_error++;
+ 
+-	if (isp_ris & RKISP1_STATS_MEAS_MASK)
++	if (rkisp1->info->isp_ver == RKISP1_V21 ||
++	    (isp_ris & RKISP1_STATS_MEAS_MASK))
+ 		rkisp1_stats_send_measurement(stats, isp_ris);
+ 
+ 	spin_unlock(&stats->lock);
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
+@@ -1159,7 +1159,16 @@
+ 
+ 		/* New frame from the sensor received */
+ 		isp_ris = rkisp1_read(rkisp1, RKISP1_CIF_ISP_RIS);
+-		if (isp_ris & RKISP1_STATS_MEAS_MASK)
++		/*
++		 * On the rk3566/rk3568 (V21) the 3A statistics come from the
++		 * raw-domain measurement blocks, not the legacy YUV-domain
++		 * blocks that raise AWB_DONE/EXP_END/AFM_FIN in ISP_RIS. Those
++		 * legacy done bits never fire here, so complete a statistics
++		 * buffer on every frame instead; rkisp1_stats_isr() fills it
++		 * from the raw-domain measurements for V21.
++		 */
++		if (rkisp1->info->isp_ver == RKISP1_V21 ||
++		    (isp_ris & RKISP1_STATS_MEAS_MASK))
+ 			rkisp1_stats_isr(&rkisp1->stats, isp_ris);
+ 		/*
+ 		 * Then update changed configs. Some of them involve
+-- 
+2.43.0

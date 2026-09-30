@@ -1,0 +1,39 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 22 Sep 2026 08:00:00 +0200
+Subject: [PATCH] media: rkisp1: rk3568: use 34-bit DMA addresses
+
+The rk3566/rk3568 ISP, like the i.MX8MP, addresses capture memory through
+a 34-bit bus: the MI base-address registers hold bits [33:2] of the DMA
+address (i.e. the address shifted right by two), and the ISP is wired
+behind its own IOMMU.
+
+Without RKISP1_FEATURE_DMA_34BIT the driver programmed the MI base
+registers with the unshifted address and set only a 32-bit DMA mask, so
+the memory interface issued a mistranslated write and the ISP IOMMU
+faulted on the very first frame:
+
+    rk_iommu fdff1a00.iommu: BUS_ERROR occurred at 0x0000000000000000
+
+The ISP received and processed the frame (its interrupt fired) but no
+buffer was ever written, so capture produced zero frames. Declare the
+feature so the MI addresses are shifted and a 34-bit DMA mask is used,
+which lets the rear OV5648 finally stream through the hardware ISP.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
+@@ -630,7 +630,8 @@
+ 	.features = RKISP1_FEATURE_MIPI_CSI2
+ 		  | RKISP1_FEATURE_SELF_PATH
+ 		  | RKISP1_FEATURE_DUAL_CROP
+-		  | RKISP1_FEATURE_BLS,
++		  | RKISP1_FEATURE_BLS
++		  | RKISP1_FEATURE_DMA_34BIT,
+ 	.max_width = 3264,
+ 	.max_height = 2448,
+ };
+-- 
+2.43.0

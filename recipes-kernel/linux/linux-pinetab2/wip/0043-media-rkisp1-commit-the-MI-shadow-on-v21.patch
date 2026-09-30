@@ -1,0 +1,52 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Tue, 23 Sep 2026 20:00:00 +0200
+Subject: [PATCH] media: rkisp1: commit the MI shadow with the V21 force-update bits
+
+The memory interface latches its buffer base/size from the shadow registers
+on a force-update write to CIF_MI_INIT. All variants use SOFT_UPD for this,
+and the Rockchip BSP force_cfg_update() writes SOFT_UPD on the rk3566/rk3568
+(V21) too, so it must be kept. In addition, on V21 the BSP forces the MP/SP
+write shadows by setting ISP21_MP_FORCE_UPD | ISP21_SP_FORCE_UPD on the same
+MI_INIT register for the CSI2RX-fed memory interface.
+
+Keep SOFT_UPD on all variants and add the V21 MP/SP force-update bits on V21.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
+@@ -144,6 +144,9 @@
+ /* MI_INIT */
+ #define RKISP1_CIF_MI_INIT_SKIP				BIT(2)
+ #define RKISP1_CIF_MI_INIT_SOFT_UPD			BIT(4)
++/* rk3566/rk3568 (V21) force-update bits for committing the MI shadow */
++#define RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21		BIT(20)
++#define RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21		BIT(21)
+ #define RKISP1_CIF_MI_INIT_MP_OUTPUT_YUV400		(0 << 5)
+ #define RKISP1_CIF_MI_INIT_MP_OUTPUT_YUV420		(1 << 5)
+ #define RKISP1_CIF_MI_INIT_MP_OUTPUT_YUV422		(2 << 5)
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-capture.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-capture.c
+@@ -1044,7 +1044,18 @@
+ 		else
+ 			reg = 0;
+ 
++		/*
++		 * Commit the MI shadow (buffer base/size). Every variant latches
++		 * it with SOFT_UPD - the Rockchip BSP force_cfg_update() writes
++		 * SOFT_UPD on V21 too, so it must stay. On the rk3566/rk3568 (V21)
++		 * the BSP additionally forces the MP/SP write shadows (it sets
++		 * ISP21_MP_FORCE_UPD | ISP21_SP_FORCE_UPD on the same MI_INIT
++		 * register for the CSI2RX-fed memory interface); add those on V21.
++		 */
+ 		reg |= RKISP1_CIF_MI_INIT_SOFT_UPD;
++		if (rkisp1->info->isp_ver == RKISP1_V21)
++			reg |= RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21 |
++			       RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21;
+ 		rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT, reg);
+ 
+ 		rkisp1_set_next_buf(cap);
+-- 
+2.43.0

@@ -1,0 +1,101 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 26 Sep 2026 22:00:00 +0200
+Subject: [PATCH] DEBUG: rkisp1 V21 offline hardware-ISP test (read a DDR frame)
+
+Decisive test of whether the rk3568 hardware ISP can process a frame from DDR
+(the basis of the VICAP->ISP path): fill the read-back buffer with a known
+vertical gradient and, from the 50ms debug poll, kick a read-back of it into
+the ISP each tick. If the hardware ISP runs, RD_LINECNT/ISP_LINECNT advance,
+V_START appears in RIS, and /dev/video5 shows a debayered non-black gradient -
+proving hardware-ISP processing works and only the DDR-fill source remains.
+This is pure hardware ISP (rkisp1 doing the work); the CPU only sets up a DMA,
+so there is no soft-ISP load. Remove before shipping.
+
+Upstream-Status: Inappropriate [debug]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+index 76bdf68..6b60d7d 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+@@ -75,6 +75,7 @@ int rkisp1_csi_link_sensor(struct rkisp1_device *rkisp1, struct v4l2_subdev *sd,
+ #define RKISP1_DBG_CSI2RX_ISP_LINECNT	(RKISP1_CIF_MIPI_BASE + 0x000000b0)
+ #define RKISP1_DBG_CSI2RX_IBUF_STATUS	(RKISP1_CIF_MIPI_BASE + 0x000000b4)
+ #define RKISP1_DBG_CSI2RX_CUR_HEADER	(RKISP1_CIF_MIPI_BASE + 0x000000c4)
++#define RKISP1_DBG_CSI2RX_RAW_RD_LINECNT	(RKISP1_CIF_MIPI_BASE + 0x00000084)
+ 
+ static struct {
+ 	struct delayed_work work;
+@@ -89,12 +90,44 @@ static void rkisp1_dbg_poll(struct work_struct *ws)
+ 	if (!rkisp1)
+ 		return;
+ 
++	/*
++	 * OFFLINE HARDWARE-ISP TEST: kick a read-back of the pre-filled DDR
++	 * buffer[0] into the ISP each tick. If the hardware ISP processes it we
++	 * see ISP_LINECNT/RD_LINECNT advance, V_START in RIS, and a non-black
++	 * frame on /dev/video5.
++	 */
++	if (rkisp1->rdbk_buf[0]) {
++		u32 v;
++
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_RD_BASE,
++			     rkisp1->rdbk_dma[0]);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW_RD_CTRL,
++			     rkisp1_read(rkisp1, RKISP1_CSI2RX_RAW_RD_CTRL) |
++			     RKISP1_CSI2RX_RAW_RD_CTRL_FORCE_UPD);
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_CTRL,
++			     rkisp1_read(rkisp1, RKISP1_CIF_MI_CTRL) |
++			     RKISP1_CIF_MI_CTRL_INIT_BASE_EN |
++			     RKISP1_CIF_MI_CTRL_INIT_OFFSET_EN);
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT,
++			     RKISP1_CIF_MI_INIT_SOFT_UPD |
++			     RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21 |
++			     RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21);
++		v = rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL);
++		rkisp1_write(rkisp1, RKISP1_CIF_ISP_CTRL,
++			     v | RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL0,
++			     RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(RKISP1_CSI2RX_IBUF_OP_MODE_RDBK1) |
++			     RKISP1_CSI2RX_CTRL0_DMA_2FRM_MODE(0) |
++			     RKISP1_CSI2RX_CTRL0_CSI2RX_EN);
++	}
++
+ 	dev_info(rkisp1->dev,
+-		 "DBGpoll %2u CTRL0=%08x VC0FRM=%08x WRLINE=%08x ISPLINE=%08x IBUF=%08x HDR=%08x ERRSTAT=%08x PHYST=%08x | ISP_CTRL=%08x RIS=%08x MIS=%08x SHD=%08x\n",
++		 "DBGpoll %2u CTRL0=%08x VC0FRM=%08x WRLINE=%08x RDLINE=%08x ISPLINE=%08x IBUF=%08x HDR=%08x ERRSTAT=%08x PHYST=%08x | ISP_CTRL=%08x RIS=%08x MIS=%08x SHD=%08x\n",
+ 		 rkisp1_dbg.n,
+ 		 rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL0),
+ 		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_VC0_FRAME_NUM),
+ 		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_RAW0_WR_LINECNT),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_RAW_RD_LINECNT),
+ 		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_ISP_LINECNT),
+ 		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_IBUF_STATUS),
+ 		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_CUR_HEADER),
+@@ -186,6 +219,25 @@ static int rkisp1_csi_rdbk_setup(struct rkisp1_device *rkisp1,
+ 		}
+ 	}
+ 
++	/*
++	 * OFFLINE HARDWARE-ISP TEST: put a known raw frame in DDR so the ISP's
++	 * read engine has something real to process, independent of whether the
++	 * CSI2RX ever writes DDR. A vertical gradient in the packed RAW10 buffer
++	 * debayers to a recognisable non-black image if the hardware ISP runs.
++	 */
++	{
++		u8 *p = rkisp1->rdbk_buf[0];
++		unsigned int y, x;
++
++		for (y = 0; y < h; y++) {
++			u8 *row = p + y * rkisp1->rdbk_stride;
++			u8 v = (y * 255) / h;	/* 0..255 top to bottom */
++
++			for (x = 0; x < rkisp1->rdbk_stride; x++)
++				row[x] = v;
++		}
++	}
++
+ 	/* raw write engine (CSI2RX -> DDR), first frame into buffer 0 */
+ 	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_BASE, rkisp1->rdbk_dma[0]);
+ 	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_SIZE, rkisp1->rdbk_size);

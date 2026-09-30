@@ -1,0 +1,116 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 26 Sep 2026 20:00:00 +0200
+Subject: [PATCH] DEBUG: rkisp1 V21 CSI2RX->ISP forwarding-path trace
+
+Temporary instrumentation to find why the rk3568 ISP core never starts a
+frame (no V_START) although the CSI2RX receives and fills the IBUF. A 50ms
+delayed-work poll dumps the CSI2RX read-only counters (frame number, raw-write
+line count, ISP line count, IBUF status, current MIPI header, error status,
+PHY state) and the ISP acquisition/vsync state (ISP_CTRL, RIS, MIS, FLAGS_SHD)
+for the first ~2s of streaming, so the fine-grained evolution and any transient
+V_START are visible in the kernel log. Remove before shipping.
+
+Upstream-Status: Inappropriate [debug]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+index eb8bed9..76bdf68 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+@@ -14,6 +14,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/interrupt.h>
+ #include <linux/lockdep.h>
++#include <linux/workqueue.h>
+ #include <linux/phy/phy.h>
+ #include <linux/phy/phy-mipi-dphy.h>
+ 
+@@ -60,6 +61,70 @@ int rkisp1_csi_link_sensor(struct rkisp1_device *rkisp1, struct v4l2_subdev *sd,
+ 	return 0;
+ }
+ 
++/*
++ * DEBUG (temporary): fine-grained trace of the V21 CSI2RX->ISP forwarding path.
++ * devmem can only sample ~1/s and cannot catch transient interrupt status; this
++ * polls the CSI2RX read-only counters and the ISP acquisition/vsync state every
++ * 50ms after stream-on so the evolution (does the IBUF fill then stall? does the
++ * CSI2RX ever forward a line to the ISP - ISP_LINECNT? does the ISP ever assert
++ * V_START in its raw status?) is visible in the kernel log. Remove before shipping.
++ */
++#define RKISP1_DBG_CSI2RX_PHY_STATE	(RKISP1_CIF_MIPI_BASE + 0x00000014)
++#define RKISP1_DBG_CSI2RX_RAW0_WR_LINECNT (RKISP1_CIF_MIPI_BASE + 0x00000044)
++#define RKISP1_DBG_CSI2RX_VC0_FRAME_NUM	(RKISP1_CIF_MIPI_BASE + 0x000000a0)
++#define RKISP1_DBG_CSI2RX_ISP_LINECNT	(RKISP1_CIF_MIPI_BASE + 0x000000b0)
++#define RKISP1_DBG_CSI2RX_IBUF_STATUS	(RKISP1_CIF_MIPI_BASE + 0x000000b4)
++#define RKISP1_DBG_CSI2RX_CUR_HEADER	(RKISP1_CIF_MIPI_BASE + 0x000000c4)
++
++static struct {
++	struct delayed_work work;
++	struct rkisp1_device *rkisp1;
++	unsigned int n;
++} rkisp1_dbg;
++
++static void rkisp1_dbg_poll(struct work_struct *ws)
++{
++	struct rkisp1_device *rkisp1 = rkisp1_dbg.rkisp1;
++
++	if (!rkisp1)
++		return;
++
++	dev_info(rkisp1->dev,
++		 "DBGpoll %2u CTRL0=%08x VC0FRM=%08x WRLINE=%08x ISPLINE=%08x IBUF=%08x HDR=%08x ERRSTAT=%08x PHYST=%08x | ISP_CTRL=%08x RIS=%08x MIS=%08x SHD=%08x\n",
++		 rkisp1_dbg.n,
++		 rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL0),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_VC0_FRAME_NUM),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_RAW0_WR_LINECNT),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_ISP_LINECNT),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_IBUF_STATUS),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_CUR_HEADER),
++		 rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_STAT),
++		 rkisp1_read(rkisp1, RKISP1_DBG_CSI2RX_PHY_STATE),
++		 rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL),
++		 rkisp1_read(rkisp1, RKISP1_CIF_ISP_RIS),
++		 rkisp1_read(rkisp1, RKISP1_CIF_ISP_MIS),
++		 rkisp1_read(rkisp1, RKISP1_CIF_ISP_FLAGS_SHD));
++
++	if (++rkisp1_dbg.n < 40)
++		schedule_delayed_work(&rkisp1_dbg.work, msecs_to_jiffies(50));
++}
++
++static void rkisp1_dbg_start(struct rkisp1_device *rkisp1)
++{
++	rkisp1_dbg.rkisp1 = rkisp1;
++	rkisp1_dbg.n = 0;
++	INIT_DELAYED_WORK(&rkisp1_dbg.work, rkisp1_dbg_poll);
++	schedule_delayed_work(&rkisp1_dbg.work, msecs_to_jiffies(50));
++}
++
++static void rkisp1_dbg_stop(void)
++{
++	if (rkisp1_dbg.rkisp1) {
++		cancel_delayed_work_sync(&rkisp1_dbg.work);
++		rkisp1_dbg.rkisp1 = NULL;
++	}
++}
++
+ static void rkisp1_csi_rdbk_free(struct rkisp1_device *rkisp1)
+ {
+ 	unsigned int i;
+@@ -348,6 +413,7 @@ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 		 * first completed frame (RAW0_WR_FRAME) kicks the first read-back
+ 		 * from rkisp1_csi_isr(), and each subsequent write chains the next.
+ 		 */
++		rkisp1_dbg_start(rkisp1);	/* DEBUG: trace forwarding path */
+ 		return 0;
+ 	}
+ 
+@@ -479,6 +545,8 @@ static int rkisp1_csi_start(struct rkisp1_csi *csi,
+ 
+ static void rkisp1_csi_stop(struct rkisp1_csi *csi)
+ {
++	rkisp1_dbg_stop();	/* DEBUG: stop the forwarding-path trace */
++
+ 	rkisp1_csi_disable(csi);
+ 
+ 	phy_power_off(csi->dphy);

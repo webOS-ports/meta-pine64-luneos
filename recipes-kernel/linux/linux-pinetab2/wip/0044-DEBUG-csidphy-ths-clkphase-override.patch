@@ -1,0 +1,84 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Wed, 24 Sep 2026 12:00:00 +0200
+Subject: [PATCH] DEBUG phy-rockchip-inno-csidphy: sysfs overrides for
+ ths_settle and rx clock phase
+
+TEMPORARY debug aid for bringing up the rear OV5648 through the ISP on the
+PineTab 2. The lower pair reaches the ISP CSI2RX and packet headers decode
+correctly (DT 0x2b RAW10, WC 1920px) but the long pixel-line payloads fail
+checksum, so no lines are forwarded to the ISP (CSI2RX ISP_LINECNT_RO stays
+0) and frames come out black - the signature of a marginal D-PHY sampling
+point at 420 Mbps.
+
+Expose the two sampling knobs as module parameters so they can be swept
+live: write the value, restart the capture (which re-runs power_on so the
+new value latches cleanly, without a disruptive mid-stream digital reset),
+and watch CSI2RX ISP_LINECNT_RO climb.
+
+  ths_settle_ovr : hsfreq/ths_settle code (default -1 = data-rate table)
+  clk_phase_ovr  : rx clock-lane phase field 0-7 (default -1 = phase 0)
+
+Upstream-Status: Inappropriate
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+--- a/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
+@@ -243,6 +243,17 @@
+ 	"phy"
+ };
+ 
++/* DEBUG (temporary): PHY sampling-point overrides, swept live via
++ * /sys/module/phy_rockchip_inno_csidphy/parameters/{ths_settle_ovr,clk_phase_ovr}
++ * followed by a cam restart so power_on() re-applies them cleanly.
++ */
++static int ths_settle_ovr = -1;
++module_param(ths_settle_ovr, int, 0644);
++MODULE_PARM_DESC(ths_settle_ovr, "override ths_settle hsfreq code (-1 = data-rate table)");
++static int clk_phase_ovr = -1;
++module_param(clk_phase_ovr, int, 0644);
++MODULE_PARM_DESC(clk_phase_ovr, "override rx clock-lane phase field 0-7 (-1 = default 0)");
++
+ static void rockchip_inno_csidphy_ths_settle(struct rockchip_inno_csidphy *priv,
+ 					     int hsfreq, int offset)
+ {
+@@ -367,12 +378,23 @@
+ 					CSIDPHY_LANE_CALIB_EN(priv->lane_offset + i));
+ 	}
+ 
+-	rockchip_inno_csidphy_ths_settle(priv, priv->hsfreq,
++	{
++		u8 eff_hsfreq = (ths_settle_ovr >= 0) ? (u8)ths_settle_ovr
++						      : priv->hsfreq;
++
++		if (ths_settle_ovr >= 0 || clk_phase_ovr >= 0)
++			dev_info(priv->dev,
++				 "DBG phy ovr: ths=0x%x (table 0x%x) clk_phase=%d lane_off=%d isp=%d\n",
++				 eff_hsfreq, priv->hsfreq, clk_phase_ovr,
++				 priv->lane_offset, priv->route_to_isp);
++
++		rockchip_inno_csidphy_ths_settle(priv, eff_hsfreq,
+ 					 priv->lane_offset ? CSIDPHY_CLK1_THS_SETTLE :
+ 							     CSIDPHY_CLK_THS_SETTLE);
+-	for (i = 0; i < priv->config.lanes; i++)
+-		rockchip_inno_csidphy_ths_settle(priv, priv->hsfreq,
+-				CSIDPHY_LANE_THS_SETTLE(priv->lane_offset + i));
++		for (i = 0; i < priv->config.lanes; i++)
++			rockchip_inno_csidphy_ths_settle(priv, eff_hsfreq,
++					CSIDPHY_LANE_THS_SETTLE(priv->lane_offset + i));
++	}
+ 
+ 	/*
+ 	 * rk3568: program the receive clock-lane phase. The vendor csi2-dphy
+@@ -388,6 +410,8 @@
+ 		u32 phase = readl(priv->phy_base + phase_off);
+ 
+ 		phase &= ~0x70;
++		if (clk_phase_ovr >= 0)
++			phase |= (clk_phase_ovr & 0x7) << 4;
+ 		writel(phase, priv->phy_base + phase_off);
+ 	}
+ 
+-- 
+2.43.0
+

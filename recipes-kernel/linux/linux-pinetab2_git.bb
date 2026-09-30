@@ -12,7 +12,8 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 # bes2600 driver in favour of the WIP cw1200-based bring-up, whose cw1200_sdio.c
 # claims the same SDIO device (0x2002) as our out-of-tree bes2600-module. See the
 # patch header and CONFIG_CW1200 in the defconfig.
-# NOTE: 0006-...-restore-LuneOS-WiFi-power.patch is deliberately NOT applied.
+# NOTE: the old "restore-LuneOS-WiFi-power" patch is deliberately NOT applied and
+# is no longer carried in-tree; the analysis it prompted is preserved below.
 #
 # It swapped megi's mmc-pwrseq-bes for mmc-pwrseq-simple, but pwrseq-simple can
 # only drive reset-gpios. That silently dropped the two lines that actually
@@ -36,36 +37,41 @@ LINUX_VERSION_EXTENSION = "-pinetab2"
 # (correct /lib/firmware path, added select_efuse field) finally get exercised -
 # they landed in the same build as 0006 and so have never actually been tested.
 #
-# The patch file is kept in-tree for the analysis it carries; re-apply only if
-# it also drives pwren and pwrkey.
+# Any re-introduction of that approach must also drive pwren and pwrkey, not just
+# reset - otherwise the BES2600 never powers on.
+#
+# Camera bring-up (rear OV5648 + front GC02M2) runs through the libcamera soft-ISP
+# path (VICAP/rkcif). The abandoned HW-ISP experiments and the CPU-OPP/i2c tuning
+# spikes are preserved under linux-pinetab2/wip/ but are deliberately NOT built.
 SRC_URI += " \
-    file://0005-arm64-dts-rockchip-pinetab2-Use-the-LuneOS-BES2600-dr.patch \
-    file://0006-arm64-dts-rockchip-pinetab2-use-DanctNIX-wifi-power.patch \
-    file://0009-arm64-dts-rockchip-pinetab2-let-the-phy-drive-otg.patch \
-    file://0010-arm64-dts-rockchip-pinetab2-limit-otg-to-full-speed.patch \
-    file://0011-arm64-dts-rockchip-pinetab2-connect-the-rear-camera.patch \
-    file://0012-media-i2c-ov5648-add-the-controls-libcamera-requires.patch \
-    file://0013-arm64-dts-rockchip-pinetab2-mux-the-camera-master-clock-and-fix-its-gpios.patch \
-    file://0014-arm64-dts-rockchip-pinetab2-keep-PD_VI-on-while-the-camera-is-powered.patch \
-    file://0015-media-i2c-ov5648-do-not-refuse-analogue-gain-while-agc-reads-enabled.patch \
-    file://0016-media-dw-mipi-csi2rx-always-report-progressive-frames.patch \
-    file://0017-arm64-dts-rockchip-pinetab2-let-the-camera-use-its-internal-avdd-regulator.patch \
-    file://0018-media-rkcif-honour-the-mbus_code-filter-when-enumerating-formats.patch \
-    file://0019-media-i2c-ov5648-keep-cached-control-values-while-powered-down.patch \
-    file://0020-media-i2c-add-a-driver-for-the-GalaxyCore-GC02M2.patch \
-    file://0021-phy-rockchip-inno-csidphy-support-the-rk3568-split-mode-lane-pair.patch \
-    file://0022-arm64-dts-rockchip-pinetab2-describe-the-front-camera.patch \
-    file://0023-media-i2c-ov5648-expose-the-orientation-and-rotation-properties.patch \
-    file://0024-arm64-dts-rockchip-pinetab2-reserve-memory-for-ramoops.patch \
-    file://0026-regulator-fan53555-let-the-device-tree-select-forced-PWM-mode.patch \
-    file://0027-arm64-dts-rockchip-pinetab2-run-vdd_cpu-in-forced-PWM-mode.patch \
-    file://0032-regulator-fan53555-cache-the-registers.patch \
-    file://0034-arm64-dts-rockchip-pinetab2-keep-vdd_cpu-flat-across-the-CPU-OPPs.patch \
-    file://0035-media-rkcif-do-not-service-streams-while-suspended-or-stopped.patch \
-    file://0036-media-rkisp1-add-rk3566-rk3568-support.patch \
-    file://0037-phy-rockchip-inno-csidphy-route-a-split-lane-pair-to-the-ISP.patch \
-    file://0038-arm64-dts-rockchip-pinetab2-bring-the-rear-camera-up-through-the-ISP.patch \
-    file://0007-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://0001-media-i2c-ov5648-add-the-controls-libcamera-requires.patch \
+    file://0002-media-i2c-ov5648-do-not-refuse-analogue-gain-while-A.patch \
+    file://0003-media-i2c-ov5648-keep-cached-control-values-while-po.patch \
+    file://0004-media-i2c-ov5648-expose-the-orientation-and-rotation.patch \
+    file://0005-media-i2c-ov5648-report-the-subsampled-modes-GBRG-Ba.patch \
+    file://0006-media-i2c-ov5648-clamp-exposure-to-the-mode-s-frame-.patch \
+    file://0007-media-i2c-add-a-driver-for-the-GalaxyCore-GC02M2.patch \
+    file://0008-media-dw-mipi-csi2rx-always-report-progressive-frame.patch \
+    file://0009-media-rkcif-honour-the-mbus_code-filter-when-enumera.patch \
+    file://0010-media-rkcif-do-not-service-streams-while-suspended-o.patch \
+    file://0011-phy-rockchip-inno-csidphy-support-the-rk3568-split-m.patch \
+    file://0012-media-dw-mipi-csi2rx-allow-two-sensors-on-the-sink-p.patch \
+    file://0013-phy-rockchip-inno-csidphy-pick-lane-pair-from-the-ac.patch \
+    file://0014-arm64-dts-rockchip-rk3566-pinetab2-add-front-and-rea.patch \
+    file://0015-arm64-dts-rk3566-pinetab2-wire-WiFi-to-the-LuneOS-be.patch \
+    file://0016-arm64-dts-rk3566-pinetab2-adopt-the-DanctNIX-WiFi-po.patch \
+    file://0017-arm64-dts-rk3566-pinetab2-force-the-OTG-port-to-peri.patch \
+    file://0018-arm64-dts-rk3566-pinetab2-limit-the-OTG-port-to-full.patch \
+    file://0019-arm64-dts-rockchip-pinetab2-reserve-memory-for-ramoo.patch \
+    file://0024-Patch-linux-framebuffer-logo-for-LuneOS.patch \
+    file://0025-arm64-dts-rockchip-pinetab2-give-Bluetooth-back-its-.patch \
+    file://0026-Bluetooth-degrade-instead-of-failing-on-a-bogus-LE-b.patch \
+    file://0027-arm64-dts-rk3566-pinetab2-let-the-WiFi-chip-wake-the.patch \
     file://defconfig \
     file://extra.cfg \
 "
+
+#    file://0020-regulator-fan53555-let-the-device-tree-select-forced.patch
+#    file://0021-arm64-dts-rockchip-pinetab2-run-vdd_cpu-in-forced-PW.patch
+#    file://0022-regulator-fan53555-cache-the-registers.patch
+#    file://0023-arm64-dts-rockchip-pinetab2-keep-vdd_cpu-flat-across.patch

@@ -1,0 +1,58 @@
+From: Herrie <claude.ai@herrie.org>
+Date: Mon, 29 Sep 2026 16:45:00 +0200
+Subject: [PATCH] arm64: dts: rk3566-pinetab2: let the WiFi chip wake the host
+
+Two things stopped the BES2600 from ever waking the board.
+
+The rail was switched off. vcc_wl is the vmmc-supply for &sdmmc1, and it
+carried regulator-state-mem { regulator-off-in-suspend; } while the same
+&sdmmc1 node asks for keep-power-in-suspend and cap-sdio-irq. Those
+contradict each other, and the regulator wins: the chip loses its 3.3 V
+in suspend, so no WoWLAN filter it has been given can match anything and
+WIFI_WAKE_HOST_H can never be asserted. Drop the override so the rail
+follows the node's keep-power-in-suspend.
+
+The node was not wakeup-capable. It already names the line both ways --
+interrupts = <RK_PC4 IRQ_TYPE_EDGE_RISING> and host-wakeup-gpios -- and
+the driver now resolves that into an IRQ and arms it with
+enable_irq_wake() for the duration of a suspend. device_set_wakeup_enable()
+only works on a device the firmware description marks as a wake source,
+so add wakeup-source.
+
+Neither of these is enough on its own, and neither is sufficient without
+the matching driver change (bes2600_wlan_bt_hostwake_register, which was
+a stub that logged "this function does nothing").
+
+Upstream-Status: Inappropriate [LuneOS-specific WiFi bring-up]
+Signed-off-by: Herrie <claude.ai@herrie.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+@@ -20,10 +20,11 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		vin-supply = <&vcc3v3_sys>;
+-
+-		regulator-state-mem {
+-			regulator-off-in-suspend;
+-		};
++		/*
++		 * No regulator-state-mem/regulator-off-in-suspend here: this is
++		 * the vmmc-supply for &sdmmc1, which asks for
++		 * keep-power-in-suspend so the chip can wake the host.
++		 */
+ 	};
+ 
+ 	sdio_pwrseq: sdio-pwrseq {
+@@ -124,6 +125,7 @@
+ 		pinctrl-0 = <&host_wake_wl &wifi_wake_host_h &wifi_regon>;
+ 
+ 		interrupt-parent = <&gpio0>;
++		wakeup-source;
+ 		interrupts = <RK_PC4 IRQ_TYPE_EDGE_RISING>;
+ 
+ 		/*

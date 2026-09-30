@@ -1,0 +1,119 @@
+From 21056cb95f2445bd7e4f57f8c3d65d019db3ee7c Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH 20/26] regulator: fan53555: let the device tree select forced
+ PWM mode
+
+The driver can switch the regulator between automatic PFM/PWM and forced
+PWM through set_mode(), but with no of_map_mode() there is no way for a
+board to ask for it, so every board runs in whatever mode the bootloader
+left. Boards feeding a CPU with large load steps want forced PWM for its
+transient response.
+
+Add the mode constants and of_map_mode(), and document the properties in
+the binding. While at it, make set_mode(NORMAL) clear the bit in the mode
+register rather than the voltage register - they only coincide on the
+original FAN53555.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../bindings/regulator/fcs,fan53555.yaml        | 10 ++++++++++
+ drivers/regulator/fan53555.c                    | 17 ++++++++++++++++-
+ include/dt-bindings/regulator/fcs,fan53555.h    | 13 +++++++++++++
+ 3 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/regulator/fcs,fan53555.h
+
+diff --git a/Documentation/devicetree/bindings/regulator/fcs,fan53555.yaml b/Documentation/devicetree/bindings/regulator/fcs,fan53555.yaml
+index 69bae90fc4b2..60a3cb8bbccc 100644
+--- a/Documentation/devicetree/bindings/regulator/fcs,fan53555.yaml
++++ b/Documentation/devicetree/bindings/regulator/fcs,fan53555.yaml
+@@ -48,6 +48,16 @@ properties:
+       VSEL0 register. When this pin is HIGH, VOUT is set by the VSEL1 register.
+     maxItems: 1
+ 
++  regulator-initial-mode:
++    description: |
++      Operating mode, FAN53555_MODE_AUTO (PFM at light load, PWM otherwise)
++      or FAN53555_MODE_FORCED_PWM, from dt-bindings/regulator/fcs,fan53555.h.
++    enum: [ 0, 1 ]
++
++  regulator-allowed-modes:
++    items:
++      enum: [ 0, 1 ]
++
+ required:
+   - compatible
+   - reg
+diff --git a/drivers/regulator/fan53555.c b/drivers/regulator/fan53555.c
+index c282236959b1..03911ba0589c 100644
+--- a/drivers/regulator/fan53555.c
++++ b/drivers/regulator/fan53555.c
+@@ -8,6 +8,7 @@
+ // Copyright (c) 2012 Marvell Technology Ltd.
+ // Yunfan Zhang <yfzhang@marvell.com>
+ 
++#include <dt-bindings/regulator/fcs,fan53555.h>
+ #include <linux/bitops.h>
+ #include <linux/err.h>
+ #include <linux/i2c.h>
+@@ -198,7 +199,7 @@ static int fan53555_set_mode(struct regulator_dev *rdev, unsigned int mode)
+ 				   di->mode_mask, di->mode_mask);
+ 		break;
+ 	case REGULATOR_MODE_NORMAL:
+-		regmap_update_bits(rdev->regmap, di->vol_reg, di->mode_mask, 0);
++		regmap_update_bits(rdev->regmap, di->mode_reg, di->mode_mask, 0);
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -206,6 +207,18 @@ static int fan53555_set_mode(struct regulator_dev *rdev, unsigned int mode)
+ 	return 0;
+ }
+ 
++static unsigned int fan53555_map_mode(unsigned int mode)
++{
++	switch (mode) {
++	case FAN53555_MODE_AUTO:
++		return REGULATOR_MODE_NORMAL;
++	case FAN53555_MODE_FORCED_PWM:
++		return REGULATOR_MODE_FAST;
++	default:
++		return REGULATOR_MODE_INVALID;
++	}
++}
++
+ static unsigned int fan53555_get_mode(struct regulator_dev *rdev)
+ {
+ 	struct fan53555_device_info *di = rdev_get_drvdata(rdev);
+@@ -687,6 +700,8 @@ static int fan53555_regulator_probe(struct i2c_client *client)
+ 		return -ENOMEM;
+ 
+ 	pdata = dev_get_platdata(&client->dev);
++	/* The mode mapping has to be in place before the constraints are parsed. */
++	di->desc.of_map_mode = fan53555_map_mode;
+ 	if (!pdata)
+ 		pdata = fan53555_parse_dt(&client->dev, np, &di->desc);
+ 
+diff --git a/include/dt-bindings/regulator/fcs,fan53555.h b/include/dt-bindings/regulator/fcs,fan53555.h
+new file mode 100644
+index 000000000000..95f7c0687e6a
+--- /dev/null
++++ b/include/dt-bindings/regulator/fcs,fan53555.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
++/*
++ * Device tree constants for the Fairchild FAN53555 family of regulators.
++ */
++
++#ifndef _DT_BINDINGS_REGULATOR_FCS_FAN53555_H
++#define _DT_BINDINGS_REGULATOR_FCS_FAN53555_H
++
++/* Operating modes, for regulator-initial-mode and regulator-allowed-modes */
++#define FAN53555_MODE_AUTO		0	/* PFM at light load, PWM otherwise */
++#define FAN53555_MODE_FORCED_PWM	1	/* always PWM */
++
++#endif
+-- 
+2.53.0
+

@@ -1,0 +1,251 @@
+From c1f4dc72e1c9fa2c87a8c16b6a6830d6c5468901 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 18:03:05 +0200
+Subject: [PATCH 14/26] arm64: dts: rockchip: rk3566-pinetab2: add front and
+ rear cameras
+
+Wire up both cameras on the PineTab2. The rear OV5648 (two lanes, lower D-PHY
+pair) and the front GC02M2 (one lane, upper pair) share the single CSI-2 D-PHY
+and the one dw-mipi-csi2rx receiver, so both are connected to the receiver's
+sink port and only one link is enabled at a time - the receiver selects the
+active sensor at stream-on and the D-PHY routes its lane pair.
+
+This also enables the CSI-2 host and VICAP, muxes CIF_CLKOUT as a pinctrl hog
+(the shared master clock for both sensors), keeps the PD_VI power domain on
+while a camera is powered, lets the sensors use their internal AVDD regulator,
+and fixes the sensor reset/powerdown GPIOs.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../boot/dts/rockchip/rk3566-pinetab2.dtsi    | 116 +++++++++++++++++-
+ arch/arm64/boot/dts/rockchip/rk356x-base.dtsi |  36 +++++-
+ 2 files changed, 145 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+index c11de7c0d987..32f37a0e3100 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -4,6 +4,7 @@
+ #include <dt-bindings/input/gpio-keys.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/leds/common.h>
++#include <dt-bindings/media/video-interfaces.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/soc/rockchip,vop2.h>
+ #include <dt-bindings/usb/pd.h>
+@@ -276,6 +277,44 @@ &csi_dphy {
+ 	status = "okay";
+ };
+ 
++&csi {
++	status = "okay";
++};
++
++/*
++ * Both sensors sit on the two halves of the single CSI-2 D-PHY - the rear
++ * OV5648 on lanes 0-1 with the first clock lane, the front GC02M2 on lane 2
++ * with the second clock lane - and share the one CSI-2 receiver. Both are
++ * wired to it here; only one link is enabled at a time (the receiver picks the
++ * active sensor at stream-on and the D-PHY follows its lane count).
++ */
++&csi {
++	phys = <&csi_dphy 0>;
++};
++
++&csi_in {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	csi_input: endpoint@0 {
++		reg = <0>;
++		bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
++		data-lanes = <1 2>;
++		remote-endpoint = <&ov5648_out>;
++	};
++
++	csi_input_front: endpoint@1 {
++		reg = <1>;
++		bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
++		data-lanes = <1>;
++		remote-endpoint = <&gc02m2_out>;
++	};
++};
++
++&vicap {
++	status = "okay";
++};
++
+ &dsi0 {
+ 	status = "okay";
+ 	clock-master;
+@@ -598,27 +637,84 @@ vcm@c {
+ 	camera@36 {
+ 		compatible = "ovti,ov5648";
+ 		reg = <0x36>;
++		/* faces away from the user; the mounting rotation still has to be measured */
++		orientation = <1>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&camerab_pdn_l &camerab_rst_l>;
++		/*
++		 * The schematic's net names are swapped with respect to the
++		 * camera connector: CAMERAF_RST_L and CAMERAF_PDN_L reach the
++		 * *rear* sensor (connector pins MIPI-RST and PDN1-B), while
++		 * CAMERAB_PDN_L enables the front one. CIF_CLKOUT is the
++		 * single master clock shared by both sensors, and nothing
++		 * muxed it onto its pin at all.
++		 */
++		pinctrl-0 = <&cameraf_pdn_l &cameraf_rst_l>;
+ 
+ 		clocks = <&cru CLK_CIF_OUT>;
+ 		assigned-clocks = <&cru CLK_CIF_OUT>;
+ 		assigned-clock-rates = <24000000>;
+ 
+-		avdd-supply = <&vcc2v8_dvp>;
++		/*
++		 * CLK_CIF_OUT is generated inside the VI power domain. Its
++		 * gate register reads back as enabled while that domain is
++		 * off, but no clock reaches the pin, so claim the domain for
++		 * as long as the sensor is powered.
++		 */
++		power-domains = <&power RK3568_PD_VI>;
++
++		/*
++		 * No avdd-supply: naming one makes the driver bypass the
++		 * sensor's internal analogue regulator, and the analogue
++		 * section then stays dead on this board - the digital side
++		 * works perfectly (the built-in test patterns come out
++		 * pixel-exact) while the pixel array reads out nothing but
++		 * fixed column noise. Letting the sensor run its own
++		 * regulator takes the frame mean from 49 to 636.
++		 */
+ 		dvdd-supply = <&vdd1v2_dvp>;
+ 		dovdd-supply = <&vcc1v8_dvp>;
+-		powerdown-gpios = <&gpio4 RK_PB3 GPIO_ACTIVE_LOW>;
+-		reset-gpios = <&gpio4 RK_PB1 GPIO_ACTIVE_LOW>;
++		powerdown-gpios = <&gpio4 RK_PB2 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_LOW>;
+ 
+ 		port {
+-			endpoint {
++			ov5648_out: endpoint {
++				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+ 				data-lanes = <1 2>;
+-				remote-endpoint = <0>;
++				remote-endpoint = <&csi_input>;
+ 				link-frequencies = /bits/ 64 <210000000 168000000>;
+ 			};
+ 		};
+ 	};
++
++	camera@37 {
++		compatible = "galaxycore,gc02m2";
++		reg = <0x37>;
++		/* faces the user; the mounting rotation still has to be measured */
++		orientation = <0>;
++		pinctrl-names = "default";
++		/* CAMERAB_PDN_L is the front sensor's powerdown, see above. */
++		pinctrl-0 = <&camerab_pdn_l>;
++
++		clocks = <&cru CLK_CIF_OUT>;
++		assigned-clocks = <&cru CLK_CIF_OUT>;
++		assigned-clock-rates = <24000000>;
++		power-domains = <&power RK3568_PD_VI>;
++
++		avdd-supply = <&vcc2v8_dvp>;
++		dovdd-supply = <&vcc1v8_dvp>;
++		/* the connector feeds the front sensor's DVDD pin from 1.8 V */
++		dvdd-supply = <&vcc1v8_dvp>;
++		powerdown-gpios = <&gpio4 RK_PB3 GPIO_ACTIVE_LOW>;
++
++		port {
++			gc02m2_out: endpoint {
++				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
++				data-lanes = <1>;
++				remote-endpoint = <&csi_input_front>;
++				link-frequencies = /bits/ 64 <336000000>;
++			};
++		};
++	};
+ };
+ 
+ &i2c5 {
+@@ -664,6 +760,14 @@ &pcie2x1 {
+ };
+ 
+ &pinctrl {
++	/*
++	 * CIF_CLKOUT is the master clock of both camera sensors, and a pin
++	 * can only be claimed by one consumer, so mux it here rather than in
++	 * either sensor node.
++	 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&cif_clk>;
++
+ 	camerab {
+ 		camerab_pdn_l: camerab-pdn-l {
+ 			rockchip,pins = <4 RK_PB3 RK_FUNC_GPIO &pcfg_pull_none>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi b/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi
+index 5dba8c392de1..36b0a68c3d1d 100644
+--- a/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk356x-base.dtsi
+@@ -639,6 +639,36 @@ vepu_mmu: iommu@fdee0800 {
+ 		#iommu-cells = <0>;
+ 	};
+ 
++	csi: csi@fdfb0000 {
++		compatible = "rockchip,rk3568-mipi-csi2";
++		reg = <0x0 0xfdfb0000 0x0 0x10000>;
++		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "err1", "err2";
++		clocks = <&cru PCLK_CSI2HOST1>;
++		phys = <&csi_dphy 0>;
++		power-domains = <&power RK3568_PD_VI>;
++		resets = <&cru SRST_P_CSI2HOST1>;
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			csi_in: port@0 {
++				reg = <0>;
++			};
++
++			csi_out: port@1 {
++				reg = <1>;
++
++				csi_output: endpoint {
++					remote-endpoint = <&vicap_mipi_input>;
++				};
++			};
++		};
++	};
++
+ 	vicap: video-capture@fdfe0000 {
+ 		compatible = "rockchip,rk3568-vicap";
+ 		reg = <0x0 0xfdfe0000 0x0 0x200>;
+@@ -667,6 +697,10 @@ vicap_dvp: port@0 {
+ 
+ 			vicap_mipi: port@1 {
+ 				reg = <1>;
++
++				vicap_mipi_input: endpoint {
++					remote-endpoint = <&csi_output>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -1841,7 +1875,7 @@ csi_dphy: phy@fe870000 {
+ 		reg = <0x0 0xfe870000 0x0 0x10000>;
+ 		clocks = <&cru PCLK_MIPICSIPHY>;
+ 		clock-names = "pclk";
+-		#phy-cells = <0>;
++		#phy-cells = <1>;
+ 		resets = <&cru SRST_P_MIPICSIPHY>;
+ 		reset-names = "apb";
+ 		rockchip,grf = <&grf>;
+-- 
+2.53.0
+

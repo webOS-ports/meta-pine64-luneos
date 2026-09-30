@@ -1,0 +1,44 @@
+From d69433b520181553f1cadf64f31e4bdfdf6a1031 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 18:01:39 +0200
+Subject: [PATCH 13/26] phy: rockchip: inno-csidphy: pick lane pair from the
+ active sensor
+
+On the split-capable RK3568 D-PHY two sensors can share the PHY and the single
+CSI-2 receiver on different lane pairs, switched at runtime. The receiver
+configures the PHY with the active sensor's lane count, so derive the lane pair
+from it in power_on (one lane -> upper pair, two lanes -> lower pair) instead of
+relying on the static of_xlate() cell, which cannot follow a runtime switch.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/phy/rockchip/phy-rockchip-inno-csidphy.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c b/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
+index e2a49f0e2e42..ab784dfb0920 100644
+--- a/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-csidphy.c
+@@ -271,6 +271,18 @@ static int rockchip_inno_csidphy_power_on(struct phy *phy)
+ 	u32 val;
+ 	int ret, i;
+ 
++	/*
++	 * When two sensors share this D-PHY and the one CSI-2 receiver on
++	 * different lane pairs (e.g. the front and rear cameras of the PineTab2,
++	 * one lane on the upper pair, two lanes on the lower pair), the receiver
++	 * selects the active sensor at stream-on and configures the PHY with its
++	 * lane count. On the split-capable variant, derive the lane pair from
++	 * that count - one lane -> upper pair, two lanes -> lower pair - so the
++	 * routing follows the active sensor rather than a static of_xlate() cell.
++	 */
++	if (drv_data->grf_regs[GRF_DPHY_CSIPHY_DATALANE1_EN].valid)
++		priv->lane_offset = (priv->config.lanes == 1) ? 2 : 0;
++
+ 	ret = clk_enable(priv->pclk);
+ 	if (ret < 0)
+ 		return ret;
+-- 
+2.53.0
+

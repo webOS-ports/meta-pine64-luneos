@@ -1,0 +1,46 @@
+From 1138d6c01724b1c06f981e713ddfdab6143785b0 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 18 Sep 2026 00:00:00 +0200
+Subject: [PATCH 08/26] media: dw-mipi-csi2rx: always report progressive frames
+
+set_fmt() copies the caller's v4l2_mbus_framefmt into the sink pad verbatim,
+so a caller that leaves the field unset stores V4L2_FIELD_ANY. Link
+validation then compares that against a sensor reporting V4L2_FIELD_NONE and
+rejects the pipeline:
+
+  v4l2_subdev_link_validate_default: field does not match (source 1, sink 0)
+  Link 'ov5648 2-0036':0 -> 'dw-mipi-csi2rx fdfb0000.csi':0 failed validation: -32
+  rockchip-cif fdfe0000.video-capture: failed to start pipeline -32
+
+CSI-2 carries progressive frames only, and the driver's own default_format
+already says V4L2_FIELD_NONE, so force it rather than trusting the caller.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/platform/synopsys/dw-mipi-csi2rx.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/media/platform/synopsys/dw-mipi-csi2rx.c b/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
+index 41e48365167e..eec2c0177b84 100644
+--- a/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
++++ b/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
+@@ -498,6 +498,14 @@ static int dw_mipi_csi2rx_set_fmt(struct v4l2_subdev *sd,
+ 	if (!fmt)
+ 		format->format = default_format;
+ 
++	/*
++	 * CSI-2 carries progressive frames only. Userspace that leaves the
++	 * field unset would otherwise store V4L2_FIELD_ANY here and every
++	 * link validation against a sensor reporting V4L2_FIELD_NONE would
++	 * fail with -EPIPE.
++	 */
++	format->format.field = V4L2_FIELD_NONE;
++
+ 	*sink = format->format;
+ 
+ 	/* propagate the format to the source pad */
+-- 
+2.53.0
+

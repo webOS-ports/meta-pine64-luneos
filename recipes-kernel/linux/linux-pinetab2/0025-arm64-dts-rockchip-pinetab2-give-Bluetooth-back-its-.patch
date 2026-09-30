@@ -1,0 +1,84 @@
+From 3bd07986c756f94d3fd49c12b54388abcdc76d91 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 25 Sep 2026 12:00:00 +0200
+Subject: [PATCH 25/26] arm64: dts: rockchip: pinetab2: give Bluetooth back its
+ uart
+
+Bluetooth stopped working on this board when it moved to megi's 7.2 tree,
+and uart1 is why.
+
+The BES2600 is a combo part: WiFi rides the SDIO bus, Bluetooth speaks HCI
+over uart1, and userspace attaches it with
+
+    hciattach -s 1500000 /dev/ttyS1 any 1500000 flow nosleep
+
+so that port has to be a full bidirectional UART with hardware flow
+control.  The LuneOS 6.6 device tree described exactly that.
+
+Commit 5f8520766526 ("arm64: dts: rockchip: rk3566-pinetab2: Add DT nodes
+for besdbg driver") repurposed the same port as a one-way serial console
+for reading the BES2600's debug output, and overrode the pinmux to match:
+
+    <2 RK_PB3 2 &pcfg_pull_down>,              // RX
+    <2 RK_PB4 RK_FUNC_GPIO &pcfg_pull_down>;   // TX
+
+RX stays on uart function 2, but TX is parked on GPIO, and CTS and RTS are
+never muxed at all -- uart1m0_ctsn and uart1m0_rtsn are /omit-if-no-ref/,
+so with nothing referencing them they are dropped from the DTB entirely.
+That is a perfectly good debug console and it is still doing its job: the
+chip's "[bt_time] execute main" banner arrives over RX.  It cannot carry
+HCI, because the SoC has no way to transmit.
+
+The symptom is easy to misread.  hci0 appears, hciattach reports success,
+and every command then times out at -110 with an all-zero BD address, which
+all points at the controller or its firmware.  Both are fine -- the counters
+give it away: TX bytes climb with each attempt while RX bytes stay at 0.
+Passing "noflow" does not help either, since that only relaxes the host's
+termios and cannot mux a pin.
+
+So put the port back the way the driver needs it: stock uart1m0_xfer has
+both pins on function 2, and referencing the ctsn and rtsn groups brings
+them into the DTB so uart-has-rtscts has something to drive.
+
+The debug console keeps working; RX is unchanged apart from the pull, which
+returns to the pull-up the stock definition uses.
+
+Upstream-Status: Inappropriate [LuneOS-specific: mainline has no Bluetooth
+node for this board, and megi's tree wants the port as a debug console]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+index 530961ed2a35..58f3b68ddf46 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2-v2.0.dts
+@@ -142,15 +142,19 @@ bes2600: wifi@1 {
+ 	};
+ };
+ 
+-// for wifi chip comm
++// BES2600 Bluetooth: HCI over uart1 with hardware flow control, plus the
++// chip's debug console on the same port.
+ &uart1 {
+-	pinctrl-0 = <&uart1m0_xfer>;
++	pinctrl-0 = <&uart1m0_xfer>, <&uart1m0_ctsn>, <&uart1m0_rtsn>;
+ 	pinctrl-names = "default";
++	uart-has-rtscts;
+ 	status = "okay";
+ };
+ 
++// Stock rk3568 muxing: both pins on uart function 2.  megi's besdbg change
++// parked TX on GPIO, which left the port unable to transmit.
+ &uart1m0_xfer {
+ 	rockchip,pins =
+-		<2 RK_PB3 2 &pcfg_pull_down>, // RX
+-		<2 RK_PB4 RK_FUNC_GPIO &pcfg_pull_down>; // TX
++		<2 RK_PB3 2 &pcfg_pull_up>, // RX
++		<2 RK_PB4 2 &pcfg_pull_up>; // TX
+ };
+-- 
+2.53.0
+

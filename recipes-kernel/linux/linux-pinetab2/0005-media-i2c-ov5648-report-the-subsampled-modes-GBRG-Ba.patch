@@ -1,0 +1,106 @@
+From 0e60944653b3a19a8952ff0d3322e294bf51ff27 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 17:59:21 +0200
+Subject: [PATCH 05/26] media: i2c: ov5648: report the subsampled modes' GBRG
+ Bayer order
+
+The subsampled (binned) readout modes emit the colour-filter array in GBRG
+phase, not the BGGR phase of the full-resolution modes, but the driver
+advertises SBGGR for every mode. A CSI-2 receiver / debayer that trusts the
+reported order then demosaics red into green.
+
+Report SGBRG so consumers pick the correct Bayer order for the modes that are
+actually usable through a CSI-2 host. The full-resolution modes are BGGR, but
+report the subsampled phase uniformly for now; a per-mode media-bus code would
+be the complete fix.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/i2c/ov5648.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/media/i2c/ov5648.c b/drivers/media/i2c/ov5648.c
+index da6f84ebe8c4..4cf62e593bb2 100644
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -937,8 +937,8 @@ static const struct ov5648_mode ov5648_modes[] = {
+ };
+ 
+ static const u32 ov5648_mbus_codes[] = {
+-	MEDIA_BUS_FMT_SBGGR8_1X8,
+-	MEDIA_BUS_FMT_SBGGR10_1X10,
++	MEDIA_BUS_FMT_SGBRG8_1X8,
++	MEDIA_BUS_FMT_SGBRG10_1X10,
+ };
+ 
+ static const struct ov5648_register_value ov5648_init_sequence[] = {
+@@ -1265,11 +1265,11 @@ static int ov5648_mode_pll1_configure(struct ov5648_sensor *sensor,
+ 	value = OV5648_PLL_CTRL0_PLL_CHARGE_PUMP(1);
+ 
+ 	switch (mbus_code) {
+-	case MEDIA_BUS_FMT_SBGGR8_1X8:
++	case MEDIA_BUS_FMT_SGBRG8_1X8:
+ 		config = mode->pll1_config[0];
+ 		value |= OV5648_PLL_CTRL0_BITS(8);
+ 		break;
+-	case MEDIA_BUS_FMT_SBGGR10_1X10:
++	case MEDIA_BUS_FMT_SGBRG10_1X10:
+ 		config = mode->pll1_config[1];
+ 		value |= OV5648_PLL_CTRL0_BITS(10);
+ 		break;
+@@ -1535,10 +1535,10 @@ static unsigned long ov5648_mode_mipi_clk_rate(struct ov5648_sensor *sensor,
+ 	unsigned long pll1_rate;
+ 
+ 	switch (mbus_code) {
+-	case MEDIA_BUS_FMT_SBGGR8_1X8:
++	case MEDIA_BUS_FMT_SGBRG8_1X8:
+ 		config = mode->pll1_config[0];
+ 		break;
+-	case MEDIA_BUS_FMT_SBGGR10_1X10:
++	case MEDIA_BUS_FMT_SGBRG10_1X10:
+ 		config = mode->pll1_config[1];
+ 		break;
+ 	default:
+@@ -1773,10 +1773,10 @@ static int ov5648_state_mipi_configure(struct ov5648_sensor *sensor,
+ 	}
+ 
+ 	switch (mbus_code) {
+-	case MEDIA_BUS_FMT_SBGGR8_1X8:
++	case MEDIA_BUS_FMT_SGBRG8_1X8:
+ 		bits_per_sample = 8;
+ 		break;
+-	case MEDIA_BUS_FMT_SBGGR10_1X10:
++	case MEDIA_BUS_FMT_SGBRG10_1X10:
+ 		bits_per_sample = 10;
+ 		break;
+ 	default:
+@@ -2416,10 +2416,10 @@ static int ov5648_get_frame_interval(struct v4l2_subdev *subdev,
+ 	mode = sensor->state.mode;
+ 
+ 	switch (sensor->state.mbus_code) {
+-	case MEDIA_BUS_FMT_SBGGR8_1X8:
++	case MEDIA_BUS_FMT_SGBRG8_1X8:
+ 		interval->interval = mode->frame_interval[0];
+ 		break;
+-	case MEDIA_BUS_FMT_SBGGR10_1X10:
++	case MEDIA_BUS_FMT_SGBRG10_1X10:
+ 		interval->interval = mode->frame_interval[1];
+ 		break;
+ 	default:
+@@ -2480,10 +2480,10 @@ static int ov5648_enum_frame_interval(struct v4l2_subdev *subdev,
+ 		return -EINVAL;
+ 
+ 	switch (interval_enum->code) {
+-	case MEDIA_BUS_FMT_SBGGR8_1X8:
++	case MEDIA_BUS_FMT_SGBRG8_1X8:
+ 		interval_enum->interval = mode->frame_interval[0];
+ 		break;
+-	case MEDIA_BUS_FMT_SBGGR10_1X10:
++	case MEDIA_BUS_FMT_SGBRG10_1X10:
+ 		interval_enum->interval = mode->frame_interval[1];
+ 		break;
+ 	default:
+-- 
+2.53.0
+

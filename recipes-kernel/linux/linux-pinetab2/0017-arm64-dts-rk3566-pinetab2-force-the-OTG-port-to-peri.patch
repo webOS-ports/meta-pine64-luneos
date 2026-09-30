@@ -1,0 +1,93 @@
+From 149a2ae6e6ca8190c78e256a8cb79169ae67da64 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Wed, 9 Sep 2026 11:53:16 +0200
+Subject: [PATCH 17/26] arm64: dts: rk3566-pinetab2: force the OTG port to
+ peripheral
+
+The USB gadget never enumerates on the charging/OTG port. Reading dwc3's own
+registers shows why - the D+ pullup is simply never asserted:
+
+    /sys/kernel/debug/usb/fcc00000.usb/mode       = device
+    /sys/kernel/debug/usb/fcc00000.usb/link_state = SS.Disabled
+    GCTL = 0x30c12004      (PRTCAPDIR = 2, device)
+    DCTL = 0x00f00000      (bit31 RUN_STOP = 0)
+
+so the controller is correctly in device mode with a bound gadget
+(configfs g1, ecm.usb0, UDC = fcc00000.usb) and a live cable - Type-C
+resolves, the port sinks 450mA from the host, extcon reports USB=1 - and the
+host still sees nothing at all, because nothing is pulling D+ up for it to
+detect.
+
+dwc3_gadget_pullup() in this tree withholds the pullup in OTG mode:
+
+    if (is_on && dwc->dr_mode == USB_DR_MODE_OTG && !dwc->current_dr_connected)
+            return 0;
+
+current_dr_connected is only ever cleared by the role-switch or extcon paths
+in drd.c; this node has neither an extcon property nor (after this patch) a
+role switch, so in principle it keeps its "true" default. Whatever leaves it
+clear in practice, dr_mode = "peripheral" removes the question: the OTG test
+is false by construction and the pullup follows the gadget binding.
+
+That is also what this port is for. The tablet has a second, dedicated host
+controller (fd000000.usb, usb_host1_xhci, with its own EHCI/OHCI companions)
+for peripherals, so nothing is lost by making this one device-only. Charging
+is unaffected - it is negotiated over CC by the RT1711H and does not involve
+dwc3's role at all.
+
+The connector's OF-graph port to dwc3 goes with the role switch, as it would
+otherwise dangle.
+
+Tested: with only the role switch removed (and dr_mode left at the SoC's
+"otg") the gadget still did not enumerate and RUN_STOP stayed clear, which is
+what prompted reading the register in the first place.
+
+Upstream-Status: Inappropriate [board configuration]
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../boot/dts/rockchip/rk3566-pinetab2.dtsi    | 21 +------------------
+ 1 file changed, 1 insertion(+), 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+index 05429c0be046..5fde8afb13fb 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3566-pinetab2.dtsi
+@@ -1001,14 +1001,8 @@ &usb_host0_ohci {
+ 
+ /* OTG port controller */
+ &usb_host0_xhci {
+-	usb-role-switch;
++	dr_mode = "peripheral";
+ 	status = "okay";
+-
+-	port {
+-		usb_host0_xhci_typec_hs: endpoint {
+-			remote-endpoint = <&typec_hs_usb_host0_xhci>;
+-		};
+-	};
+ };
+ 
+ &usb_host1_xhci {
+@@ -1082,19 +1076,6 @@ connector {
+ 			op-sink-microwatt = <2500000>;
+ 			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+ 			source-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_USB_COMM)>;
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port@0 {
+-					reg = <0>;
+-
+-					typec_hs_usb_host0_xhci: endpoint {
+-						remote-endpoint = <&usb_host0_xhci_typec_hs>;
+-					};
+-				};
+-			};
+ 		};
+ 	};
+ };
+-- 
+2.53.0
+

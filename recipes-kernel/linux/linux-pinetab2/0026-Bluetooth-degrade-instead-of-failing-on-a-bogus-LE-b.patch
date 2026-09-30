@@ -1,0 +1,107 @@
+From 14ce2b02532fb785d90d83ef078efec4b4fbd4bc Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 25 Sep 2026 14:00:00 +0200
+Subject: [PATCH 26/26] Bluetooth: degrade instead of failing on a bogus LE
+ buffer size
+
+The BES2600 on the PineTab2 answers LE Read Buffer Size V2 with Success and
+then a malformed payload -- 10 bytes where the specification says 7, parsing
+out as an LE ACL MTU of 16:
+
+    LE Read Buffer v2 (0x08|0x0060) ncmd 5
+      Status: Success (0x00)
+      ACL MTU: 16
+      ACL max packet: 251
+      ISO MTU: 251
+      ISO max packet: 6
+
+16 is below HCI_MIN_LE_MTU, so hci_cc_le_read_buffer_size_v2() returns
+HCI_ERROR_INVALID_PARAMETERS, and because this runs during the init
+sequence the whole thing is abandoned:
+
+    Bluetooth: hci0: Opcode 0x2060 failed: -22
+    Can't init device hci0: Invalid argument (22)
+
+The adapter is otherwise fine.  It enumerates, answers 30-odd commands,
+reports sensible features and a valid BD address -- but it is unusable,
+because one command in the middle of init returns a value the host will not
+accept.
+
+Failing hard here is heavy-handed, since the kernel already has a perfectly
+good representation for "this controller has no dedicated LE buffers":
+le_mtu of zero, which makes it share the BR/EDR pool --
+
+    cnt = hdev->le_mtu ? hdev->le_cnt : hdev->acl_cnt;   (hci_core.c)
+
+-- and that is a much better outcome than no Bluetooth at all.  So when the
+reported MTU cannot be right, say so and fall back to that, rather than
+rejecting the command.
+
+The V2 path additionally clears the ISO counts.  Their values came out of
+the same malformed response and cannot be trusted either; zeroing them
+keeps the host from sizing isochronous transfers from garbage.
+
+Both handlers get the same treatment: the V1 response is just as capable of
+being wrong, and a controller that lies about one is a fair bet to lie about
+the other.
+
+Upstream-Status: Inappropriate [works around a specific non-compliant
+firmware; upstream would want this behind a controller quirk, and the H4
+transport used here has no way to set one]
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ net/bluetooth/hci_event.c | 30 ++++++++++++++++++++++++++----
+ 1 file changed, 26 insertions(+), 4 deletions(-)
+
+diff --git a/net/bluetooth/hci_event.c b/net/bluetooth/hci_event.c
+index 741d658e9630..8d7d300d2435 100644
+--- a/net/bluetooth/hci_event.c
++++ b/net/bluetooth/hci_event.c
+@@ -1217,8 +1217,18 @@ static u8 hci_cc_le_read_buffer_size(struct hci_dev *hdev, void *data,
+ 
+ 	BT_DBG("%s le mtu %d:%d", hdev->name, hdev->le_mtu, hdev->le_pkts);
+ 
+-	if (hdev->le_mtu && hdev->le_mtu < HCI_MIN_LE_MTU)
+-		return HCI_ERROR_INVALID_PARAMETERS;
++	/* A controller that reports an MTU below the minimum is telling us
++	 * something that cannot be true.  Rather than abandon the init
++	 * sequence over it, fall back to the BR/EDR buffer pool, which is
++	 * what an le_mtu of zero already means everywhere else.
++	 */
++	if (hdev->le_mtu && hdev->le_mtu < HCI_MIN_LE_MTU) {
++		bt_dev_warn(hdev, "invalid LE MTU %u, sharing the BR/EDR buffers",
++			    hdev->le_mtu);
++		hdev->le_mtu = 0;
++		hdev->le_pkts = 0;
++		hdev->le_cnt = 0;
++	}
+ 
+ 	return rp->status;
+ }
+@@ -3792,8 +3802,20 @@ static u8 hci_cc_le_read_buffer_size_v2(struct hci_dev *hdev, void *data,
+ 	BT_DBG("%s acl mtu %d:%d iso mtu %d:%d", hdev->name, hdev->acl_mtu,
+ 	       hdev->acl_pkts, hdev->iso_mtu, hdev->iso_pkts);
+ 
+-	if (hdev->le_mtu && hdev->le_mtu < HCI_MIN_LE_MTU)
+-		return HCI_ERROR_INVALID_PARAMETERS;
++	/* See hci_cc_le_read_buffer_size().  The ISO counts came out of the
++	 * same response, so drop those too rather than size transfers from a
++	 * reply we have already decided not to believe.
++	 */
++	if (hdev->le_mtu && hdev->le_mtu < HCI_MIN_LE_MTU) {
++		bt_dev_warn(hdev, "invalid LE MTU %u, sharing the BR/EDR buffers",
++			    hdev->le_mtu);
++		hdev->le_mtu = 0;
++		hdev->le_pkts = 0;
++		hdev->le_cnt = 0;
++		hdev->iso_mtu = 0;
++		hdev->iso_pkts = 0;
++		hdev->iso_cnt = 0;
++	}
+ 
+ 	return rp->status;
+ }
+-- 
+2.53.0
+

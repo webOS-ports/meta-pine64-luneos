@@ -1,0 +1,362 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sun, 21 Sep 2026 16:30:00 +0200
+Subject: [PATCH] media: rkisp1: receive through the CSI2RX host on rk3566/rk3568 (V21)
+
+The rk3566/rk3568 ISP does not receive through the legacy MIPI CSI-2
+receiver that the older versions drive. It has a newer "CSI2RX" host that
+occupies the same register window (RKISP1_CIF_MIPI_BASE) with a different
+layout, and that is the block actually wired to the D-PHY - so configuring
+the legacy receiver leaves the ISP with no data at all.
+
+Add a distinct RKISP1_V21 version and give it its own CSI-2 receiver setup:
+program CSI2RX CTRL1 (lanes), CTRL2 (line counter), DATA_IDS_1 (the sensor's
+data identifier) and CTRL0 (online IBUF op mode + enable), and skip the
+legacy MIPI_CTRL/IMG_DATA_SEL/IMSC path. Enable/disable toggle the CSI2RX
+enable bit, and the MIPI interrupt handler returns early since frame
+completion is signalled by the MI interrupt and the CSI2RX interrupts are
+left masked. V21 shares the rest of the V12 register model (clock control,
+stats and params layouts).
+
+Modelled on the rk3568 CSI2RX programming in the Rockchip BSP rkisp driver.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+index 48d700d..0c38a7c 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+@@ -11,6 +11,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/interrupt.h>
+ #include <linux/lockdep.h>
+ #include <linux/phy/phy.h>
+ #include <linux/phy/phy-mipi-dphy.h>
+@@ -69,6 +70,102 @@ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 	if (lanes < 1 || lanes > 4)
+ 		return -EINVAL;
+ 
++	/*
++	 * The rk3568 (V21) receives through the CSI2RX host, which shares this
++	 * register window but has a different layout. Configure it directly and
++	 * skip the legacy MIPI receiver, which is not wired to the D-PHY here.
++	 */
++	if (rkisp1->info->isp_ver == RKISP1_V21) {
++		/*
++		 * Program the CSI2RX host for ISP_V21 as the Rockchip BSP does:
++		 * lanes, line-counter, the sensor's data identifier, the four
++		 * error/status interrupt masks, and CTRL0 (IBUF op mode plus the
++		 * receiver enable, see the CTRL0 write below).
++		 *
++		 * The mask registers are interrupt enables. The receiver's
++		 * online path needs them enabled, but the interrupts are
++		 * level-triggered and must be acknowledged by reading the ERR_*
++		 * status registers every interrupt, otherwise the shared line
++		 * (GIC 89) storms and starves the ISP/MI - see rkisp1_csi_isr().
++		 */
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL1, lanes - 1);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL2,
++			     RKISP1_CSI2RX_CTRL2_LINECNT_MAX);
++		/* data id on all four IDs: the BSP sets ID0-3 (online path uses ID1+) */
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_DATA_IDS_1, format->mipi_dt |
++			     format->mipi_dt << 8 | format->mipi_dt << 16 | format->mipi_dt << 24);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_DATA_IDS_2, 0);
++		/* clear latched status, then enable the error/status sources */
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_PHY);
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_PACKET);
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_OVERFLOW);
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_STAT);
++		/*
++		 * Enable the PHY / packet / overflow error interrupt sources
++		 * with the exact values the Rockchip BSP uses on its stream-on
++		 * path (drivers/media/platform/rockchip/isp/rkisp.c), and leave
++		 * MASK_STAT at 0. MASK_STAT contains the per-line MIPI_LINECNT
++		 * source, which fires every scanline (~30k/s at 1080p) on the
++		 * shared, level-triggered CSI2RX line and starves the ISP/MI so
++		 * no frame ever completes - the BSP deliberately never enables
++		 * it here.
++		 */
++		/*
++		 * Leave the PHY error interrupt masked: the inno-csidphy on this
++		 * lower-pair->ISP path reports continuous SOT sync errors, and
++		 * enabling PHY_ERR_SOTHS/SOTSYNCHS floods the shared,
++		 * level-triggered CSI2RX line and starves the ISP/MI. The SOT
++		 * errors are harmless to the image. Keep packet/overflow enabled;
++		 * MASK_STAT stays off (its per-line MIPI_LINECNT would storm too).
++		 */
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PHY, 0);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PACKET, 0x0f1fffff);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_OVERFLOW, 0x007f7ff1);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_STAT, 0);
++		/*
++		 * Online capture, no HDR. IBUF_OP_MODE = NORMAL (0) selects the
++		 * online (non-read-back) path: the CSI2RX forwards framed data
++		 * straight into the ISP's on-chip image buffer (IBUF) as soon as
++		 * the ISP core runs. This matches the Rockchip BSP single-sensor
++		 * online path (rkisp_online_update_reg()), which programs only
++		 * SW_IBUF_OP_MODE(NORMAL) here. SW_CSI2RX_EN is a one-shot
++		 * read-back DMA trigger, not an online enable, and must not be set
++		 * on the online path: setting it diverts the receiver to the DDR
++		 * read-back engine, so the ISP never sees a frame start (V_START)
++		 * and every frame is black. Latched by the ISP CFG_UPD below.
++		 */
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL0,
++			     RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(RKISP1_CSI2RX_IBUF_OP_MODE_NORMAL));
++		/*
++		 * Latch the CSI2RX configuration. On V21 the receiver's config
++		 * (op_mode, DATA_IDS) is committed by a memory-interface config
++		 * update, not by the plain ISP CFG_UPD: the BSP force_cfg_update()
++		 * sets CIF_MI_CTRL INIT_BASE_EN|INIT_OFFSET_EN and then writes
++		 * CIF_MI_INIT SOFT_UPD (csi.c: "op_mode update by mi_cfg_upd").
++		 * The ISP core is already started when this source subdev streams
++		 * on, so issuing the MI update here makes the receiver actually
++		 * begin forwarding framed pixels into the ISP IBUF - without it the
++		 * CSI2RX receives full frames (VC0_FRAME_NUM_RO counts) but never
++		 * forwards a line (ISP_LINECNT_RO stays 0) and every frame is black.
++		 * Keep the ISP CFG_UPD as well so the ISP-side shadows latch too.
++		 */
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_CTRL,
++			     rkisp1_read(rkisp1, RKISP1_CIF_MI_CTRL) |
++			     RKISP1_CIF_MI_CTRL_INIT_BASE_EN |
++			     RKISP1_CIF_MI_CTRL_INIT_OFFSET_EN);
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT,
++			     RKISP1_CIF_MI_INIT_SOFT_UPD);
++		mipi_ctrl = rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL);
++		rkisp1_write(rkisp1, RKISP1_CIF_ISP_CTRL,
++			     mipi_ctrl | RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD);
++		dev_dbg(rkisp1->dev,
++			"CSI2RX CTRL0 0x%08x CTRL1 0x%08x IDS1 0x%08x\n",
++			rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL0),
++			rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL1),
++			rkisp1_read(rkisp1, RKISP1_CSI2RX_DATA_IDS_1));
++		return 0;
++	}
++
+ 	mipi_ctrl = RKISP1_CIF_MIPI_CTRL_NUM_LANES(lanes - 1) |
+ 		    RKISP1_CIF_MIPI_CTRL_SHUTDOWNLANES(0xf) |
+ 		    RKISP1_CIF_MIPI_CTRL_ERR_SOT_SYNC_HS_SKIP |
+@@ -115,6 +212,14 @@ static void rkisp1_csi_enable(struct rkisp1_csi *csi)
+ 	struct rkisp1_device *rkisp1 = csi->rkisp1;
+ 	u32 val;
+ 
++	/*
++	 * On V21 the CSI2RX host is fully programmed in rkisp1_csi_config() and
++	 * forwards into the ISP as soon as the ISP core runs; there is no
++	 * legacy MIPI output-enable to toggle here.
++	 */
++	if (rkisp1->info->isp_ver == RKISP1_V21)
++		return;
++
+ 	val = rkisp1_read(rkisp1, RKISP1_CIF_MIPI_CTRL);
+ 	rkisp1_write(rkisp1, RKISP1_CIF_MIPI_CTRL,
+ 		     val | RKISP1_CIF_MIPI_CTRL_OUTPUT_ENA);
+@@ -125,6 +230,10 @@ static void rkisp1_csi_disable(struct rkisp1_csi *csi)
+ 	struct rkisp1_device *rkisp1 = csi->rkisp1;
+ 	u32 val;
+ 
++	/* V21 has no receiver-enable to clear; it stops with the ISP core. */
++	if (rkisp1->info->isp_ver == RKISP1_V21)
++		return;
++
+ 	/* Mask MIPI interrupts. */
+ 	rkisp1_write(rkisp1, RKISP1_CIF_MIPI_IMSC, 0);
+ 
+@@ -199,6 +308,22 @@ irqreturn_t rkisp1_csi_isr(int irq, void *ctx)
+ 	if (!rkisp1->irqs_enabled)
+ 		return IRQ_NONE;
+ 
++	/*
++	 * On V21 this line belongs to the CSI2RX host. On this
++	 * inno-csidphy/CSI2RX combination the D-PHY SOT error interrupt stays
++	 * permanently asserted (MASK_PHY cannot be cleared - it reads back with
++	 * its low byte forced on), so this shared, level-triggered line storms
++	 * continuously and starves the ISP and MI, which are the interrupts
++	 * that actually drive capture. The CSI2RX interrupt carries nothing
++	 * this driver needs (frame completion comes from the ISP/MI), so the
++	 * first time it fires just disable this IRQ line for good - the
++	 * receiver keeps running and the SOT errors are harmless to the image.
++	 */
++	if (rkisp1->info->isp_ver == RKISP1_V21) {
++		disable_irq_nosync(irq);
++		return IRQ_HANDLED;
++	}
++
+ 	status = rkisp1_read(rkisp1, RKISP1_CIF_MIPI_MIS);
+ 	if (!status)
+ 		return IRQ_NONE;
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
+index 944c38f..a0c9b85 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c
+@@ -626,7 +626,7 @@ static const struct rkisp1_info rk3568_isp_info = {
+ 	.num_clocks = 3,
+ 	.isrs = px30_isp_isrs,
+ 	.isr_size = ARRAY_SIZE(px30_isp_isrs),
+-	.isp_ver = RKISP1_V12,
++	.isp_ver = RKISP1_V21,
+ 	.features = RKISP1_FEATURE_MIPI_CSI2
+ 		  | RKISP1_FEATURE_SELF_PATH
+ 		  | RKISP1_FEATURE_DUAL_CROP
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
+index d777662..797e9aa 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c
+@@ -230,8 +230,24 @@ static int rkisp1_config_isp(struct rkisp1_isp *isp,
+ 			else
+ 				isp_ctrl = RKISP1_CIF_ISP_CTRL_ISP_MODE_RAW_PICT;
+ 		} else {
+-			rkisp1_write(rkisp1, RKISP1_CIF_ISP_DEMOSAIC,
+-				     RKISP1_CIF_ISP_DEMOSAIC_TH(0xc));
++			/*
++			 * The rk3568 (V21) moved demosaicing to a dedicated
++			 * debayer block (ISP_DEBAYER_CONTROL) and the legacy
++			 * ISP_DEMOSAIC register does nothing there. Without the
++			 * debayer block enabled the raw Bayer input is never
++			 * converted to RGB/YUV and the ISP outputs black frames.
++			 * Enable it (green and chroma interpolation filters on),
++			 * as the vendor BSP does; keep the legacy write for the
++			 * older variants.
++			 */
++			if (rkisp1->info->isp_ver == RKISP1_V21)
++				rkisp1_write(rkisp1, RKISP1_CIF_ISP_DEBAYER_CONTROL,
++					     RKISP1_CIF_ISP_DEBAYER_EN |
++					     RKISP1_CIF_ISP_DEBAYER_FILTER_G_EN |
++					     RKISP1_CIF_ISP_DEBAYER_FILTER_C_EN);
++			else
++				rkisp1_write(rkisp1, RKISP1_CIF_ISP_DEMOSAIC,
++					     RKISP1_CIF_ISP_DEMOSAIC_TH(0xc));
+ 
+ 			if (mbus_type == V4L2_MBUS_BT656)
+ 				isp_ctrl = RKISP1_CIF_ISP_CTRL_ISP_MODE_BAYER_ITU656;
+@@ -425,6 +441,19 @@ static void rkisp1_config_clk(struct rkisp1_isp *isp)
+ 		      RKISP1_CIF_CLK_CTRL_MI_READ | RKISP1_CIF_CLK_CTRL_MI_RAWRD |
+ 		      RKISP1_CIF_CLK_CTRL_CP | RKISP1_CIF_CLK_CTRL_IE;
+ 		rkisp1_write(rkisp1, RKISP1_CIF_VI_ISP_CLK_CTRL_V12, val);
++	} else if (rkisp1->info->isp_ver == RKISP1_V21) {
++		/*
++		 * The rk3566/rk3568 (V21) VI_ISP_CLK_CTRL register has a
++		 * different bit layout from the px30 (V12): here bit 0 is the
++		 * raw ISP processing clock (ISP_RAW) and bits 13-22 are the
++		 * memory-interface clocks (MI_LDC/MP/JPEG/DP/Y12/SP/RAW0/RAW1/
++		 * READ/RAWRD). The px30 value leaves ISP_RAW and several MI
++		 * clocks gated, so the ISP DMAs empty (black) frames even though
++		 * it receives data. Program the value the vendor BSP uses for
++		 * the V21 online path: raw ISP clock + all MI clocks.
++		 */
++		rkisp1_write(rkisp1, RKISP1_CIF_VI_ISP_CLK_CTRL_V12,
++			     0x007fe001);
+ 	}
+ }
+ 
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c
+index 042b759..9ad234d 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c
+@@ -2899,7 +2899,8 @@ int rkisp1_params_register(struct rkisp1_device *rkisp1)
+ 
+ 	params->metafmt = &rkisp1_params_formats[RKISP1_PARAMS_FIXED];
+ 
+-	if (params->rkisp1->info->isp_ver == RKISP1_V12)
++	if (params->rkisp1->info->isp_ver == RKISP1_V12 ||
++	    params->rkisp1->info->isp_ver == RKISP1_V21)
+ 		params->ops = &rkisp1_v12_params_ops;
+ 	else
+ 		params->ops = &rkisp1_v10_params_ops;
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h b/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
+index 2d9c3d4..d1d21a0 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
+@@ -882,6 +882,16 @@
+ #define RKISP1_CIF_ISP_OUT_H_SIZE		(RKISP1_CIF_ISP_BASE + 0x0000019c)
+ #define RKISP1_CIF_ISP_OUT_V_SIZE		(RKISP1_CIF_ISP_BASE + 0x000001a0)
+ #define RKISP1_CIF_ISP_DEMOSAIC			(RKISP1_CIF_ISP_BASE + 0x000001a4)
++
++/*
++ * rk3566/rk3568 (V21) dedicated debayer block, replacing the legacy
++ * ISP_DEMOSAIC register. Bit 0 enables demosaicing; without it the raw Bayer
++ * input is never converted and the ISP outputs black frames.
++ */
++#define RKISP1_CIF_ISP_DEBAYER_CONTROL		0x00002500
++#define RKISP1_CIF_ISP_DEBAYER_EN			BIT(0)
++#define RKISP1_CIF_ISP_DEBAYER_FILTER_G_EN		BIT(4)
++#define RKISP1_CIF_ISP_DEBAYER_FILTER_C_EN		BIT(8)
+ #define RKISP1_CIF_ISP_FLAGS_SHD		(RKISP1_CIF_ISP_BASE + 0x000001a8)
+ #define RKISP1_CIF_ISP_OUT_H_OFFS_SHD		(RKISP1_CIF_ISP_BASE + 0x000001ac)
+ #define RKISP1_CIF_ISP_OUT_V_OFFS_SHD		(RKISP1_CIF_ISP_BASE + 0x000001b0)
+@@ -1128,6 +1138,38 @@
+ #define RKISP1_CIF_MIPI_GEN_SHORT_C_D		(RKISP1_CIF_MIPI_BASE + 0x00000050)
+ #define RKISP1_CIF_MIPI_GEN_SHORT_E_F		(RKISP1_CIF_MIPI_BASE + 0x00000054)
+ 
++/*
++ * rk3566/rk3568 (V21) CSI-2 host receiver "CSI2RX". It occupies the same
++ * register window as the legacy MIPI receiver (RKISP1_CIF_MIPI_BASE) but with
++ * a different layout, and it is the block actually wired to the D-PHY on these
++ * SoCs - the legacy MIPI receiver the other versions drive never receives.
++ */
++#define RKISP1_CSI2RX_CTRL0			(RKISP1_CIF_MIPI_BASE + 0x00000000)
++#define RKISP1_CSI2RX_CTRL1			(RKISP1_CIF_MIPI_BASE + 0x00000004)
++#define RKISP1_CSI2RX_CTRL2			(RKISP1_CIF_MIPI_BASE + 0x00000008)
++#define RKISP1_CSI2RX_CSI2_RESETN		(RKISP1_CIF_MIPI_BASE + 0x00000010)
++#define RKISP1_CSI2RX_DATA_IDS_1		(RKISP1_CIF_MIPI_BASE + 0x00000018)
++#define RKISP1_CSI2RX_DATA_IDS_2		(RKISP1_CIF_MIPI_BASE + 0x0000001c)
++#define RKISP1_CSI2RX_ERR_PHY			(RKISP1_CIF_MIPI_BASE + 0x00000020)
++#define RKISP1_CSI2RX_ERR_PACKET		(RKISP1_CIF_MIPI_BASE + 0x00000024)
++#define RKISP1_CSI2RX_ERR_OVERFLOW		(RKISP1_CIF_MIPI_BASE + 0x00000028)
++#define RKISP1_CSI2RX_ERR_STAT			(RKISP1_CIF_MIPI_BASE + 0x0000002c)
++#define RKISP1_CSI2RX_MASK_PHY			(RKISP1_CIF_MIPI_BASE + 0x00000030)
++#define RKISP1_CSI2RX_MASK_PACKET		(RKISP1_CIF_MIPI_BASE + 0x00000034)
++#define RKISP1_CSI2RX_MASK_OVERFLOW		(RKISP1_CIF_MIPI_BASE + 0x00000038)
++#define RKISP1_CSI2RX_MASK_STAT			(RKISP1_CIF_MIPI_BASE + 0x0000003c)
++
++/* CSI2RX_CTRL0 */
++#define RKISP1_CSI2RX_CTRL0_CSI2RX_EN		BIT(0)
++#define RKISP1_CSI2RX_CTRL0_HDR_ESP_MODE(a)	(((a) & 0x3) << 2)
++#define RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(a)	(((a) & 0xf) << 8)
++/* CSI2RX_CTRL0 IBUF op mode: 0 = normal (online, no HDR) */
++#define RKISP1_CSI2RX_IBUF_OP_MODE_NORMAL	0
++/* CSI2RX_CTRL2 line-counter run value */
++#define RKISP1_CSI2RX_CTRL2_LINECNT_MAX		0x3fff
++/* CSI2RX_DATA_IDS_1: data identifier (vc[7:6], dt[5:0]) per virtual id */
++#define RKISP1_CSI2RX_DATA_IDS_ID0(a)		((a) & 0xff)
++
+ #define RKISP1_CIF_ISP_AFM_BASE			0x00002000
+ #define RKISP1_CIF_ISP_AFM_CTRL			(RKISP1_CIF_ISP_AFM_BASE + 0x00000000)
+ #define RKISP1_CIF_ISP_AFM_LT_A			(RKISP1_CIF_ISP_AFM_BASE + 0x00000004)
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c
+index d5fdb8f..baf9d48 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-stats.c
+@@ -402,7 +402,8 @@ static void rkisp1_init_stats(struct rkisp1_stats *stats)
+ 	stats->vdev_fmt.fmt.meta.buffersize =
+ 		sizeof(struct rkisp1_stat_buffer);
+ 
+-	if (stats->rkisp1->info->isp_ver == RKISP1_V12)
++	if (stats->rkisp1->info->isp_ver == RKISP1_V12 ||
++	    stats->rkisp1->info->isp_ver == RKISP1_V21)
+ 		stats->ops = &rkisp1_v12_stats_ops;
+ 	else
+ 		stats->ops = &rkisp1_v10_stats_ops;
+diff --git a/include/uapi/linux/rkisp1-config.h b/include/uapi/linux/rkisp1-config.h
+index 832b1db..ba66033 100644
+--- a/include/uapi/linux/rkisp1-config.h
++++ b/include/uapi/linux/rkisp1-config.h
+@@ -200,6 +200,8 @@
+  *	histogram as v12.
+  * @RKISP1_V_IMX8MP: Used in at least i.MX8MP. Same number of entries in grids
+  *	and histogram as v10.
++ * @RKISP1_V21: Used in RK3566 and RK3568. Same grid/histogram entries as v12,
++ *	but with a newer CSI-2 host receiver (CSI2RX) at the MIPI base.
+  */
+ enum rkisp1_cif_isp_version {
+ 	RKISP1_V10 = 10,
+@@ -207,6 +209,7 @@ enum rkisp1_cif_isp_version {
+ 	RKISP1_V12,
+ 	RKISP1_V13,
+ 	RKISP1_V_IMX8MP,
++	RKISP1_V21,
+ };
+ 
+ enum rkisp1_cif_isp_histogram_mode {

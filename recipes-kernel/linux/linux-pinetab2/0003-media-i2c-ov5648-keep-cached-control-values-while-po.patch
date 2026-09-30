@@ -1,0 +1,52 @@
+From bd019cb2e562cd1b6ad44bc9534f0a0a03f4672f Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Fri, 18 Sep 2026 00:00:00 +0200
+Subject: [PATCH 03/26] media: i2c: ov5648: keep cached control values while
+ powered down
+
+ov5648_g_volatile_ctrl() reads the exposure and gain registers over I2C
+unconditionally, but the sensor is only powered between runtime resume and
+suspend, so every read outside that window fails:
+
+  'ov5648 2-0036': Unable to read control 0x00980911: No such device or address
+
+VIDIOC_G_EXT_CTRLS then returns an error and the control is left unset.
+libcamera reads the exposure while configuring, before anything has started
+streaming, and its software ISP goes on to fetch the value it believes it
+just read, which aborts the process:
+
+  controls.h:189: T libcamera::ControlValue::get() const [with T = int]:
+  Assertion `type_ == details::control_type<...>::value' failed.
+
+ov5648_s_ctrl() already returns early when the device is suspended and leaves
+the cached value in place; do the same when reading.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ drivers/media/i2c/ov5648.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/media/i2c/ov5648.c b/drivers/media/i2c/ov5648.c
+index 81e0e5a3277e..02bf1f419120 100644
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -1999,6 +1999,14 @@ static int ov5648_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
+ 	struct ov5648_ctrls *ctrls = &sensor->ctrls;
+ 	int ret;
+ 
++	/*
++	 * The registers cannot be read while the sensor is powered down, and
++	 * failing the read leaves the control unset for userspace. Keep the
++	 * cached value instead, which is what the setters already do.
++	 */
++	if (pm_runtime_suspended(sensor->dev))
++		return 0;
++
+ 	switch (ctrl->id) {
+ 	case V4L2_CID_EXPOSURE_AUTO:
+ 		ret = ov5648_exposure_value(sensor, &ctrls->exposure->val);
+-- 
+2.53.0
+

@@ -1,0 +1,76 @@
+From 95d0a797c2f681b022908958f940b1274fce12a8 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Sat, 19 Sep 2026 00:00:00 +0200
+Subject: [PATCH 04/26] media: i2c: ov5648: expose the orientation and rotation
+ properties
+
+Parse the standard orientation and rotation firmware properties and expose
+them as the V4L2_CID_CAMERA_ORIENTATION and V4L2_CID_CAMERA_SENSOR_ROTATION
+controls, as most sensor drivers do, so that userspace (libcamera) can tell
+which side of the device the sensor faces and how it is mounted.
+
+Let the binding accept the properties by referencing video-interface-devices.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../devicetree/bindings/media/i2c/ovti,ov5648.yaml    |  5 ++++-
+ drivers/media/i2c/ov5648.c                            | 11 +++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov5648.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov5648.yaml
+index 8028c8b107c4..deaddd6e5ff0 100644
+--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov5648.yaml
++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov5648.yaml
+@@ -9,6 +9,9 @@ title: OmniVision OV5648 Image Sensor
+ maintainers:
+   - Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+ 
++allOf:
++  - $ref: /schemas/media/video-interface-devices.yaml#
++
+ properties:
+   compatible:
+     const: ovti,ov5648
+@@ -66,7 +69,7 @@ required:
+   - dovdd-supply
+   - port
+ 
+-additionalProperties: false
++unevaluatedProperties: false
+ 
+ examples:
+   - |
+diff --git a/drivers/media/i2c/ov5648.c b/drivers/media/i2c/ov5648.c
+index 02bf1f419120..da6f84ebe8c4 100644
+--- a/drivers/media/i2c/ov5648.c
++++ b/drivers/media/i2c/ov5648.c
+@@ -2126,6 +2126,7 @@ static int ov5648_ctrls_init(struct ov5648_sensor *sensor)
+ 	struct ov5648_ctrls *ctrls = &sensor->ctrls;
+ 	struct v4l2_ctrl_handler *handler = &ctrls->handler;
+ 	const struct v4l2_ctrl_ops *ops = &ov5648_ctrl_ops;
++	struct v4l2_fwnode_device_properties props;
+ 	int ret;
+ 
+ 	v4l2_ctrl_handler_init(handler, 32);
+@@ -2224,6 +2225,16 @@ static int ov5648_ctrls_init(struct ov5648_sensor *sensor)
+ 		v4l2_ctrl_new_std(handler, NULL, V4L2_CID_PIXEL_RATE, 1,
+ 				  INT_MAX, 1, 1);
+ 
++	/* Orientation and rotation from the firmware node */
++
++	ret = v4l2_fwnode_device_parse(sensor->dev, &props);
++	if (ret)
++		goto error_ctrls;
++
++	ret = v4l2_ctrl_new_fwnode_properties(handler, ops, &props);
++	if (ret)
++		goto error_ctrls;
++
+ 	if (handler->error) {
+ 		ret = handler->error;
+ 		goto error_ctrls;
+-- 
+2.53.0
+

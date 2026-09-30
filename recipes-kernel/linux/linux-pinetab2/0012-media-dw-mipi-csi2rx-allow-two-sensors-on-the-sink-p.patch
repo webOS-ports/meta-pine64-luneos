@@ -1,0 +1,213 @@
+From 83e81b1406ac743b2d22ae2cd288686c019e5c76 Mon Sep 17 00:00:00 2001
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Mon, 28 Sep 2026 18:00:48 +0200
+Subject: [PATCH 12/26] media: dw-mipi-csi2rx: allow two sensors on the sink
+ port
+
+Boards can wire more than one sensor to the receiver's single sink port and
+switch between them at runtime (e.g. the front and rear cameras of the PineTab2,
+which share the one CSI-2 host on opposite D-PHY lane pairs). Only one link is
+enabled at a time.
+
+Register every endpoint on the sink port as an async remote rather than just the
+first, record each sensor's lane count on bind, and resolve the active sensor at
+stream-on via the enabled link (media_pad_remote_pad_first) instead of requiring
+a unique remote. The PHY is then configured with the active sensor's lane count,
+so a downstream PHY can route the correct lane pair.
+
+Upstream-Status: Pending
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+ .../media/platform/synopsys/dw-mipi-csi2rx.c  | 130 +++++++++++++-----
+ 1 file changed, 99 insertions(+), 31 deletions(-)
+
+diff --git a/drivers/media/platform/synopsys/dw-mipi-csi2rx.c b/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
+index eec2c0177b84..2d61dd1402a4 100644
+--- a/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
++++ b/drivers/media/platform/synopsys/dw-mipi-csi2rx.c
+@@ -120,9 +120,33 @@ struct dw_mipi_csi2rx_device {
+ 	u32 lanes_num;
+ 	u64 enabled_streams;
+ 
++	/*
++	 * PineTab2: up to two sensors (front + rear) share this single sink,
++	 * one enabled link at a time. Track each sensor's lane count so the
++	 * active one (resolved at stream-on) drives the PHY.
++	 */
++	struct {
++		struct v4l2_subdev *sd;
++		u32 lanes;
++	} sources[2];
++	unsigned int num_sources;
++
+ 	const struct dw_mipi_csi2rx_drvdata *drvdata;
+ };
+ 
++static u32 dw_mipi_csi2rx_active_lanes(struct dw_mipi_csi2rx_device *csi2,
++				       struct media_pad *source_pad)
++{
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(source_pad->entity);
++	unsigned int i;
++
++	for (i = 0; i < csi2->num_sources; i++)
++		if (csi2->sources[i].sd == sd)
++			return csi2->sources[i].lanes;
++
++	return csi2->lanes_num;
++}
++
+ static const u32 rk3568_regs[DW_MIPI_CSI2RX_MAX] = {
+ 	[DW_MIPI_CSI2RX_N_LANES] = DW_REG(0x4),
+ 	[DW_MIPI_CSI2RX_RESETN] = DW_REG(0x10),
+@@ -362,19 +386,21 @@ static int dw_mipi_csi2rx_start(struct dw_mipi_csi2rx_device *csi2)
+ {
+ 	struct media_pad *source_pad;
+ 	union phy_configure_opts opts;
+-	u32 lanes = csi2->lanes_num;
++	u32 lanes;
+ 	u32 control = 0;
+ 	s64 link_freq;
+ 	int ret;
+ 
++	/* Use the enabled link's source, so the active sensor drives lanes. */
++	source_pad = media_pad_remote_pad_first(
++		&csi2->pads[DW_MIPI_CSI2RX_PAD_SINK]);
++	if (!source_pad)
++		return -ENODEV;
++
++	lanes = dw_mipi_csi2rx_active_lanes(csi2, source_pad);
+ 	if (lanes < 1 || lanes > 4)
+ 		return -EINVAL;
+ 
+-	source_pad = media_pad_remote_pad_unique(
+-		&csi2->pads[DW_MIPI_CSI2RX_PAD_SINK]);
+-	if (IS_ERR(source_pad))
+-		return PTR_ERR(source_pad);
+-
+ 	/* set mult and div to 0, thus completely rely on V4L2_CID_LINK_FREQ */
+ 	link_freq = v4l2_get_link_freq(source_pad, 0, 0);
+ 	if (link_freq < 0)
+@@ -646,10 +672,10 @@ dw_mipi_csi2rx_get_frame_desc(struct v4l2_subdev *sd, unsigned int pad,
+ 	struct v4l2_subdev *remote_sd;
+ 	struct media_pad *remote_pad;
+ 
+-	remote_pad = media_pad_remote_pad_unique(&csi2->pads[DW_MIPI_CSI2RX_PAD_SINK]);
+-	if (IS_ERR(remote_pad)) {
++	remote_pad = media_pad_remote_pad_first(&csi2->pads[DW_MIPI_CSI2RX_PAD_SINK]);
++	if (!remote_pad) {
+ 		dev_err(csi2->dev, "can't get remote source pad\n");
+-		return PTR_ERR(remote_pad);
++		return -ENODEV;
+ 	}
+ 
+ 	remote_sd = media_entity_to_v4l2_subdev(remote_pad->entity);
+@@ -705,10 +731,32 @@ static int dw_mipi_csi2rx_notifier_bound(struct v4l2_async_notifier *notifier,
+ 	struct dw_mipi_csi2rx_device *csi2 =
+ 		container_of(notifier, struct dw_mipi_csi2rx_device, notifier);
+ 	struct media_pad *sink_pad = &csi2->pads[DW_MIPI_CSI2RX_PAD_SINK];
++	u32 flags = MEDIA_LNK_FL_ENABLED;
+ 	int ret;
+ 
+-	ret = v4l2_create_fwnode_links_to_pad(sd, sink_pad,
+-					      MEDIA_LNK_FL_ENABLED);
++	/*
++	 * Record this sensor's lane count and, when a second sensor shares the
++	 * sink, leave its link disabled so exactly one is enabled at a time -
++	 * media-ctl / libcamera switches between them at runtime.
++	 */
++	if (csi2->num_sources < ARRAY_SIZE(csi2->sources)) {
++		struct fwnode_handle *sep __free(fwnode_handle) =
++			fwnode_graph_get_endpoint_by_id(dev_fwnode(sd->dev), 0, 0, 0);
++		struct v4l2_fwnode_endpoint vep = { .bus_type = V4L2_MBUS_UNKNOWN };
++
++		csi2->sources[csi2->num_sources].sd = sd;
++		if (sep && !v4l2_fwnode_endpoint_parse(sep, &vep))
++			csi2->sources[csi2->num_sources].lanes =
++				vep.bus.mipi_csi2.num_data_lanes;
++		else
++			csi2->sources[csi2->num_sources].lanes = csi2->lanes_num;
++
++		if (csi2->num_sources > 0)
++			flags = 0;
++		csi2->num_sources++;
++	}
++
++	ret = v4l2_create_fwnode_links_to_pad(sd, sink_pad, flags);
+ 	if (ret) {
+ 		dev_err(csi2->dev, "failed to link source pad of %s\n",
+ 			sd->name);
+@@ -731,31 +779,51 @@ static int dw_mipi_csi2rx_register_notifier(struct dw_mipi_csi2rx_device *csi2)
+ 	struct device *dev = csi2->dev;
+ 	int ret;
+ 
+-	struct fwnode_handle *ep __free(fwnode_handle) =
+-		fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), 0, 0, 0);
+-	if (!ep)
+-		return dev_err_probe(dev, -ENODEV, "failed to get endpoint\n");
++	unsigned int i, n = 0;
+ 
+-	vep.bus_type = V4L2_MBUS_UNKNOWN;
+-	ret = v4l2_fwnode_endpoint_parse(ep, &vep);
+-	if (ret)
+-		return dev_err_probe(dev, ret, "failed to parse endpoint\n");
++	v4l2_async_subdev_nf_init(ntf, sd);
++	ntf->ops = &dw_mipi_csi2rx_notifier_ops;
+ 
+-	if (vep.bus_type != V4L2_MBUS_CSI2_DPHY &&
+-	    vep.bus_type != V4L2_MBUS_CSI2_CPHY)
+-		return dev_err_probe(dev, -EINVAL,
+-				     "invalid bus type of endpoint\n");
++	/*
++	 * Register every endpoint on the sink port. Boards may wire two sensors
++	 * here (front + rear on the PineTab2); only one link is enabled at a
++	 * time and the active sensor is resolved at stream-on.
++	 */
++	for (i = 0; ; i++) {
++		struct fwnode_handle *ep __free(fwnode_handle) =
++			fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), 0, i, 0);
+ 
+-	csi2->bus_type = vep.bus_type;
+-	csi2->lanes_num = vep.bus.mipi_csi2.num_data_lanes;
++		if (!ep)
++			break;
+ 
+-	v4l2_async_subdev_nf_init(ntf, sd);
+-	ntf->ops = &dw_mipi_csi2rx_notifier_ops;
++		vep.bus_type = V4L2_MBUS_UNKNOWN;
++		ret = v4l2_fwnode_endpoint_parse(ep, &vep);
++		if (ret) {
++			dev_err_probe(dev, ret, "failed to parse endpoint\n");
++			goto err_nf_cleanup;
++		}
++
++		if (vep.bus_type != V4L2_MBUS_CSI2_DPHY &&
++		    vep.bus_type != V4L2_MBUS_CSI2_CPHY) {
++			ret = dev_err_probe(dev, -EINVAL,
++					    "invalid bus type of endpoint\n");
++			goto err_nf_cleanup;
++		}
++
++		csi2->bus_type = vep.bus_type;
++		csi2->lanes_num = vep.bus.mipi_csi2.num_data_lanes;
++
++		asd = v4l2_async_nf_add_fwnode_remote(ntf, ep,
++						      struct v4l2_async_connection);
++		if (IS_ERR(asd)) {
++			ret = PTR_ERR(asd);
++			goto err_nf_cleanup;
++		}
++		n++;
++	}
+ 
+-	asd = v4l2_async_nf_add_fwnode_remote(ntf, ep,
+-					      struct v4l2_async_connection);
+-	if (IS_ERR(asd)) {
+-		ret = PTR_ERR(asd);
++	if (!n) {
++		ret = dev_err_probe(dev, -ENODEV, "failed to get endpoint\n");
+ 		goto err_nf_cleanup;
+ 	}
+ 
+-- 
+2.53.0
+

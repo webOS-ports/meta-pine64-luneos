@@ -1,0 +1,483 @@
+From: Herman van Hazendonk <github.com@herrie.org>
+Date: Thu, 25 Sep 2026 18:00:00 +0200
+Subject: [PATCH] media: rkisp1: rk3568 (V21) CSI2RX read-back datapath
+
+On the rk3566/rk3568 (V21) the CSI2RX host receives and decodes frames
+correctly (its VC0_FRAME_NUM_RO frame counter tracks the sensor at full rate
+and the packet headers are valid RAW10) but it never forwards a pixel line
+into the ISP core online: ISP_LINECNT_RO stays 0, the ISP raises H_START and
+FRAME_IN but never V_START, and every online capture is black. This was
+confirmed with a byte-for-byte match of the Rockchip BSP's online register
+programming (op mode, DATA_IDS, masks, clocks, the MI config-update commit) -
+the online IBUF path simply does not deliver frames to the ISP core on this
+SoC.
+
+The BSP's read-back datapath does work: the CSI2RX raw-write engine (dmatx0)
+writes each received raw frame to a DDR buffer and the ISP raw-read engine
+(dmarx0) reads it back and processes it, which regenerates the frame timing so
+the ISP actually starts and completes a frame. Port that path for V21:
+
+  - two ping-pong DDR buffers so a frame being read back is never overwritten
+    by the next incoming frame;
+  - program the raw write engine (MI_RAW0_WR_*, CSI2RX_RAW0_WR_*) and the raw
+    read engine (MI_RAW0_RD_*), put the receiver in read-back op mode, and
+    unmask only the RAW0_WR_FRAME status interrupt;
+  - on RAW0_WR_FRAME (a full frame written to DDR), point the read engine at
+    the just-written buffer, steer the next incoming frame to the other buffer,
+    latch the MI/ISP shadows and pulse the receiver (SW_CSI2RX_EN in read-back
+    op mode) to read the frame back into the ISP.
+
+The read-back is paced from the CSI2RX interrupt (which fires per frame
+written to DDR, independent of the ISP), not from an ISP frame-end - the ISP
+never completes a frame until it is fed, so pacing from its frame-end would
+dead-lock.
+
+Modelled on drivers/media/platform/rockchip/isp/{capture_v21,dmarx,rkisp}.c
+in the Rockchip BSP.
+
+Upstream-Status: Pending
+
+Signed-off-by: Herman van Hazendonk <github.com@herrie.org>
+---
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h b/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h
+index 6152e4c..cbe4021 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h
+@@ -600,6 +600,20 @@ struct rkisp1_device {
+ 	bool irqs_enabled;
+ 	struct regmap *qos[2];
+ 	unsigned int qos_count;
++
++	/*
++	 * rk3568 (V21) read-back datapath: the CSI2RX writes each received raw
++	 * frame to a DDR buffer and the ISP reads it back and processes it. Two
++	 * buffers ping-pong so a frame being read back is never overwritten by
++	 * the next incoming frame.
++	 */
++	void *rdbk_buf[2];
++	dma_addr_t rdbk_dma[2];
++	unsigned int rdbk_size;
++	unsigned int rdbk_stride;
++	u16 rdbk_width;
++	u16 rdbk_height;
++	u8 rdbk_wr;
+ };
+ 
+ /*
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+index 0c38a7c..eb8bed9 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-csi.c
+@@ -11,6 +11,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/dma-mapping.h>
+ #include <linux/interrupt.h>
+ #include <linux/lockdep.h>
+ #include <linux/phy/phy.h>
+@@ -59,6 +60,189 @@ int rkisp1_csi_link_sensor(struct rkisp1_device *rkisp1, struct v4l2_subdev *sd,
+ 	return 0;
+ }
+ 
++static void rkisp1_csi_rdbk_free(struct rkisp1_device *rkisp1)
++{
++	unsigned int i;
++
++	for (i = 0; i < 2; i++) {
++		if (rkisp1->rdbk_buf[i]) {
++			dma_free_attrs(rkisp1->dev, rkisp1->rdbk_size,
++				       rkisp1->rdbk_buf[i], rkisp1->rdbk_dma[i],
++				       0);
++			rkisp1->rdbk_buf[i] = NULL;
++		}
++	}
++}
++
++/*
++ * rk3568 (V21) read-back datapath. On this SoC the CSI2RX receives and decodes
++ * frames (VC0_FRAME_NUM_RO counts) but never forwards a line into the ISP core
++ * online (ISP_LINECNT_RO stays 0, no ISP V_START), so every online capture is
++ * black no matter how the receiver and ISP are programmed. The BSP's read-back
++ * path is used instead: the CSI2RX raw-write engine (dmatx0) writes each frame
++ * to a DDR buffer, and the ISP raw-read engine (dmarx0) reads it back and
++ * processes it, regenerating the frame timing so the ISP actually starts and
++ * completes a frame. Two ping-pong buffers keep the frame being read back from
++ * being overwritten by the next incoming frame. rkisp1_csi_rdbk_setup() arms
++ * the write engine; each read-back is kicked from rkisp1_csi_isr() when the
++ * CSI2RX signals a full frame has landed in DDR (RAW0_WR_FRAME).
++ */
++static int rkisp1_csi_rdbk_setup(struct rkisp1_device *rkisp1,
++				 const struct rkisp1_mbus_info *format)
++{
++	unsigned int w = rkisp1->rdbk_width;
++	unsigned int h = rkisp1->rdbk_height;
++	unsigned int bpp, i;
++
++	if (!w || !h)
++		return -EINVAL;
++
++	switch (format->mipi_dt) {
++	case 0x2a: bpp = 8; break;	/* RAW8 */
++	case 0x2b: bpp = 10; break;	/* RAW10 */
++	case 0x2c: bpp = 12; break;	/* RAW12 */
++	default:   bpp = 10; break;
++	}
++
++	rkisp1->rdbk_stride = DIV_ROUND_UP(w * bpp, 8);
++	rkisp1->rdbk_size = rkisp1->rdbk_stride * h;
++	rkisp1->rdbk_wr = 0;
++
++	for (i = 0; i < 2; i++) {
++		if (rkisp1->rdbk_buf[i])
++			continue;
++		rkisp1->rdbk_buf[i] = dma_alloc_attrs(rkisp1->dev,
++						      rkisp1->rdbk_size,
++						      &rkisp1->rdbk_dma[i],
++						      GFP_KERNEL, 0);
++		if (!rkisp1->rdbk_buf[i]) {
++			rkisp1_csi_rdbk_free(rkisp1);
++			return -ENOMEM;
++		}
++	}
++
++	/* raw write engine (CSI2RX -> DDR), first frame into buffer 0 */
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_BASE, rkisp1->rdbk_dma[0]);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_SIZE, rkisp1->rdbk_size);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_LENGTH, rkisp1->rdbk_stride);
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW0_WR_PIC_SIZE, (h << 16) | w);
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW0_WR_PIC_OFF, 0);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_WR_CTRL2,
++		     rkisp1_read(rkisp1, RKISP1_CIF_MI_WR_CTRL2) |
++		     RKISP1_CIF_MI_WR_CTRL2_RAW0_AUTOUPD);
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW0_WR_CTRL,
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_CH_EN(1) |
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_EN |
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_FORCE_UPD);
++
++	/* raw read engine (DDR -> ISP), first read-back from buffer 0 */
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_RD_BASE, rkisp1->rdbk_dma[0]);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_RD_LENGTH, rkisp1->rdbk_stride);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RD_CTRL2,
++		     rkisp1_read(rkisp1, RKISP1_CIF_MI_RD_CTRL2) |
++		     RKISP1_CIF_MI_RD_CTRL2_RAW0_AUTOUPD);
++	/*
++	 * Configure the CSI2RX raw-read DMA (dmarx0): compact memory layout
++	 * (RAW_RD_CTRL = 0) and the frame geometry. Without this the read engine
++	 * is unconfigured and reads from address 0 (IOMMU faults at iova 0).
++	 */
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW_RD_PIC_SIZE, (h << 16) | w);
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW_RD_CTRL, 0);
++
++	/*
++	 * Commit the MI shadow so the RAW0 write/read base/size/length latch to
++	 * the active registers. The RAW0 base registers only latch on a MI
++	 * config update with CIF_MI_CTRL INIT_BASE_EN|INIT_OFFSET_EN set (the BSP
++	 * force_cfg_update()); without those the read/write DMA uses base 0.
++	 */
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_CTRL,
++		     rkisp1_read(rkisp1, RKISP1_CIF_MI_CTRL) |
++		     RKISP1_CIF_MI_CTRL_INIT_BASE_EN |
++		     RKISP1_CIF_MI_CTRL_INIT_OFFSET_EN);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT,
++		     RKISP1_CIF_MI_INIT_SOFT_UPD |
++		     RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21 |
++		     RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21);
++
++	dev_info(rkisp1->dev,
++		 "V21 read-back: %ux%u stride %u size %u buf0 %pad buf1 %pad\n",
++		 w, h, rkisp1->rdbk_stride, rkisp1->rdbk_size,
++		 &rkisp1->rdbk_dma[0], &rkisp1->rdbk_dma[1]);
++	return 0;
++}
++
++/*
++ * Kick one read-back cycle. Called from the CSI2RX interrupt when a full raw
++ * frame has been written to DDR (RAW0_WR_FRAME). Modelled on the Rockchip BSP
++ * internal raw write/read buffer rotate (drivers/media/platform/rockchip/isp/
++ * dmarx.c, T_AUTO path): the read engine is pointed at the address the write
++ * engine just committed - read straight back from MI_RAW0_WR_BASE_SHD - so the
++ * ISP reads exactly the frame that just landed in DDR (pointing read and write
++ * at different buffers reads an unwritten one and faults). The write engine is
++ * then advanced to the other ping-pong buffer and re-forced so the next frame
++ * lands there, and the receiver is pulsed in read-back op mode (SW_CSI2RX_EN is
++ * a one-shot read-back DMA trigger) to read the frame back into the ISP.
++ */
++static void rkisp1_csi_rdbk_trigger(struct rkisp1_device *rkisp1)
++{
++	u32 wr_shd, val;
++
++	if (!rkisp1->rdbk_buf[0])
++		return;
++
++	/* read back exactly the buffer the write engine just committed to DDR */
++	wr_shd = rkisp1_read(rkisp1, RKISP1_CIF_MI_RAW0_WR_BASE_SHD);
++	if (wr_shd)
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_RD_BASE, wr_shd);
++	else
++		rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_RD_BASE,
++			     rkisp1->rdbk_dma[rkisp1->rdbk_wr]);
++
++	/* steer the next incoming frame to the other ping-pong buffer */
++	rkisp1->rdbk_wr ^= 1;
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_RAW0_WR_BASE,
++		     rkisp1->rdbk_dma[rkisp1->rdbk_wr]);
++	/* re-force both DMA engines so the new bases latch to the shadows */
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW0_WR_CTRL,
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_CH_EN(1) |
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_EN |
++		     RKISP1_CSI2RX_RAW0_WR_CTRL_FORCE_UPD);
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_RAW_RD_CTRL,
++		     rkisp1_read(rkisp1, RKISP1_CSI2RX_RAW_RD_CTRL) |
++		     RKISP1_CSI2RX_RAW_RD_CTRL_FORCE_UPD);
++	/*
++	 * Latch the new RAW0 read/write bases. The base registers only commit on
++	 * a MI config update with CIF_MI_CTRL INIT_BASE_EN|INIT_OFFSET_EN set.
++	 */
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_CTRL,
++		     rkisp1_read(rkisp1, RKISP1_CIF_MI_CTRL) |
++		     RKISP1_CIF_MI_CTRL_INIT_BASE_EN |
++		     RKISP1_CIF_MI_CTRL_INIT_OFFSET_EN);
++	rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT,
++		     RKISP1_CIF_MI_INIT_SOFT_UPD |
++		     RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21 |
++		     RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21);
++
++	val = rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL);
++	rkisp1_write(rkisp1, RKISP1_CIF_ISP_CTRL,
++		     val | RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD);
++
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL0,
++		     RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(RKISP1_CSI2RX_IBUF_OP_MODE_RDBK1) |
++		     RKISP1_CSI2RX_CTRL0_DMA_2FRM_MODE(0) |
++		     RKISP1_CSI2RX_CTRL0_CSI2RX_EN);
++
++	/*
++	 * Restore NORMAL op mode so the raw-write engine keeps filling DDR with
++	 * the next incoming frame (the read-back pulse above is a one-shot that
++	 * latches on the SW_CSI2RX_EN edge). Without this the receiver stays in
++	 * read-back mode, no further frame is written, and no RAW0_WR_FRAME comes
++	 * to chain the next read-back.
++	 */
++	rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL0,
++		     RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(RKISP1_CSI2RX_IBUF_OP_MODE_NORMAL));
++}
++
+ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 			     const struct rkisp1_sensor_async *sensor,
+ 			     const struct rkisp1_mbus_info *format)
+@@ -66,6 +250,7 @@ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 	struct rkisp1_device *rkisp1 = csi->rkisp1;
+ 	unsigned int lanes = sensor->lanes;
+ 	u32 mipi_ctrl;
++	int ret;
+ 
+ 	if (lanes < 1 || lanes > 4)
+ 		return -EINVAL;
+@@ -101,60 +286,55 @@ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_OVERFLOW);
+ 		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_STAT);
+ 		/*
+-		 * Enable the PHY / packet / overflow error interrupt sources
+-		 * with the exact values the Rockchip BSP uses on its stream-on
+-		 * path (drivers/media/platform/rockchip/isp/rkisp.c), and leave
+-		 * MASK_STAT at 0. MASK_STAT contains the per-line MIPI_LINECNT
+-		 * source, which fires every scanline (~30k/s at 1080p) on the
+-		 * shared, level-triggered CSI2RX line and starves the ISP/MI so
+-		 * no frame ever completes - the BSP deliberately never enables
+-		 * it here.
++		 * Read-back datapath: only the raw-frame-written status interrupt
++		 * is needed. Keep the PHY / packet / overflow error sources masked
++		 * so the shared, level-triggered CSI2RX line does not storm; enable
++		 * only RAW0_WR_FRAME, which rkisp1_csi_isr() uses to kick each
++		 * frame's read-back.
+ 		 */
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PHY, 0);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PACKET, 0);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_OVERFLOW, 0);
++		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_STAT,
++			     RKISP1_CSI2RX_STAT_RAW0_WR_FRAME);
++
+ 		/*
+-		 * Leave the PHY error interrupt masked: the inno-csidphy on this
+-		 * lower-pair->ISP path reports continuous SOT sync errors, and
+-		 * enabling PHY_ERR_SOTHS/SOTSYNCHS floods the shared,
+-		 * level-triggered CSI2RX line and starves the ISP/MI. The SOT
+-		 * errors are harmless to the image. Keep packet/overflow enabled;
+-		 * MASK_STAT stays off (its per-line MIPI_LINECNT would storm too).
++		 * On this rk3568 the CSI2RX does not forward frames to the ISP
++		 * online (it receives and decodes full frames but never delivers
++		 * a line, so the ISP stalls with black output). Use the read-back
++		 * path: program the raw write engine (CSI2RX -> DDR) and the raw
++		 * read engine (DDR -> ISP), and put the receiver in read-back op
++		 * mode. rkisp1_csi_isr() kicks each frame's read-back when the
++		 * write of a frame to DDR completes (RAW0_WR_FRAME).
+ 		 */
+-		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PHY, 0);
+-		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_PACKET, 0x0f1fffff);
+-		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_OVERFLOW, 0x007f7ff1);
+-		rkisp1_write(rkisp1, RKISP1_CSI2RX_MASK_STAT, 0);
++		ret = rkisp1_csi_rdbk_setup(rkisp1, format);
++		if (ret)
++			return ret;
+ 		/*
+-		 * Online capture, no HDR. IBUF_OP_MODE = NORMAL (0) selects the
+-		 * online (non-read-back) path: the CSI2RX forwards framed data
+-		 * straight into the ISP's on-chip image buffer (IBUF) as soon as
+-		 * the ISP core runs. This matches the Rockchip BSP single-sensor
+-		 * online path (rkisp_online_update_reg()), which programs only
+-		 * SW_IBUF_OP_MODE(NORMAL) here. SW_CSI2RX_EN is a one-shot
+-		 * read-back DMA trigger, not an online enable, and must not be set
+-		 * on the online path: setting it diverts the receiver to the DDR
+-		 * read-back engine, so the ISP never sees a frame start (V_START)
+-		 * and every frame is black. Latched by the ISP CFG_UPD below.
++		 * Keep the receiver in NORMAL op mode: on this SoC the CSI2RX
++		 * raw-write engine only writes received frames to DDR while in
++		 * NORMAL (in read-back op mode it reads, but never writes, so
++		 * nothing ever lands in DDR). The per-frame read-back pulse in
++		 * rkisp1_csi_rdbk_trigger() briefly switches to read-back op mode
++		 * to read the just-written frame, then restores NORMAL.
+ 		 */
+ 		rkisp1_write(rkisp1, RKISP1_CSI2RX_CTRL0,
+ 			     RKISP1_CSI2RX_CTRL0_IBUF_OP_MODE(RKISP1_CSI2RX_IBUF_OP_MODE_NORMAL));
+ 		/*
+-		 * Latch the CSI2RX configuration. On V21 the receiver's config
+-		 * (op_mode, DATA_IDS) is committed by a memory-interface config
+-		 * update, not by the plain ISP CFG_UPD: the BSP force_cfg_update()
+-		 * sets CIF_MI_CTRL INIT_BASE_EN|INIT_OFFSET_EN and then writes
+-		 * CIF_MI_INIT SOFT_UPD (csi.c: "op_mode update by mi_cfg_upd").
+-		 * The ISP core is already started when this source subdev streams
+-		 * on, so issuing the MI update here makes the receiver actually
+-		 * begin forwarding framed pixels into the ISP IBUF - without it the
+-		 * CSI2RX receives full frames (VC0_FRAME_NUM_RO counts) but never
+-		 * forwards a line (ISP_LINECNT_RO stays 0) and every frame is black.
+-		 * Keep the ISP CFG_UPD as well so the ISP-side shadows latch too.
++		 * The CSI2RX control shadow (op_mode) latches on an MI config
++		 * update and the ISP CFG_UPD. Issue both here, after the receiver
++		 * and the raw engines are programmed and with the ISP core already
++		 * running, so the write engine starts filling DDR; the first
++		 * RAW0_WR_FRAME then kicks the first read-back.
+ 		 */
+ 		rkisp1_write(rkisp1, RKISP1_CIF_MI_CTRL,
+ 			     rkisp1_read(rkisp1, RKISP1_CIF_MI_CTRL) |
+ 			     RKISP1_CIF_MI_CTRL_INIT_BASE_EN |
+ 			     RKISP1_CIF_MI_CTRL_INIT_OFFSET_EN);
+ 		rkisp1_write(rkisp1, RKISP1_CIF_MI_INIT,
+-			     RKISP1_CIF_MI_INIT_SOFT_UPD);
++			     RKISP1_CIF_MI_INIT_SOFT_UPD |
++			     RKISP1_CIF_MI_INIT_MP_FORCE_UPD_V21 |
++			     RKISP1_CIF_MI_INIT_SP_FORCE_UPD_V21);
+ 		mipi_ctrl = rkisp1_read(rkisp1, RKISP1_CIF_ISP_CTRL);
+ 		rkisp1_write(rkisp1, RKISP1_CIF_ISP_CTRL,
+ 			     mipi_ctrl | RKISP1_CIF_ISP_CTRL_ISP_CFG_UPD);
+@@ -163,6 +343,11 @@ static int rkisp1_csi_config(struct rkisp1_csi *csi,
+ 			rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL0),
+ 			rkisp1_read(rkisp1, RKISP1_CSI2RX_CTRL1),
+ 			rkisp1_read(rkisp1, RKISP1_CSI2RX_DATA_IDS_1));
++		/*
++		 * Writing to DDR now runs autonomously in NORMAL op mode; the
++		 * first completed frame (RAW0_WR_FRAME) kicks the first read-back
++		 * from rkisp1_csi_isr(), and each subsequent write chains the next.
++		 */
+ 		return 0;
+ 	}
+ 
+@@ -297,6 +482,9 @@ static void rkisp1_csi_stop(struct rkisp1_csi *csi)
+ 	rkisp1_csi_disable(csi);
+ 
+ 	phy_power_off(csi->dphy);
++
++	if (csi->rkisp1->info->isp_ver == RKISP1_V21)
++		rkisp1_csi_rdbk_free(csi->rkisp1);
+ }
+ 
+ irqreturn_t rkisp1_csi_isr(int irq, void *ctx)
+@@ -309,18 +497,22 @@ irqreturn_t rkisp1_csi_isr(int irq, void *ctx)
+ 		return IRQ_NONE;
+ 
+ 	/*
+-	 * On V21 this line belongs to the CSI2RX host. On this
+-	 * inno-csidphy/CSI2RX combination the D-PHY SOT error interrupt stays
+-	 * permanently asserted (MASK_PHY cannot be cleared - it reads back with
+-	 * its low byte forced on), so this shared, level-triggered line storms
+-	 * continuously and starves the ISP and MI, which are the interrupts
+-	 * that actually drive capture. The CSI2RX interrupt carries nothing
+-	 * this driver needs (frame completion comes from the ISP/MI), so the
+-	 * first time it fires just disable this IRQ line for good - the
+-	 * receiver keeps running and the SOT errors are harmless to the image.
++	 * On V21 this line belongs to the CSI2RX host and paces the read-back
++	 * datapath. Only RAW0_WR_FRAME is unmasked (all error sources are
++	 * masked, so the line does not storm): when the CSI2RX has written a
++	 * full raw frame to DDR, kick a read-back of that frame into the ISP.
++	 * Read the ERR_* status registers to clear the latched, level-triggered
++	 * sources so the line deasserts.
+ 	 */
+ 	if (rkisp1->info->isp_ver == RKISP1_V21) {
+-		disable_irq_nosync(irq);
++		u32 stat = rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_STAT);
++
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_PHY);
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_PACKET);
++		rkisp1_read(rkisp1, RKISP1_CSI2RX_ERR_OVERFLOW);
++
++		if (stat & RKISP1_CSI2RX_STAT_RAW0_WR_FRAME)
++			rkisp1_csi_rdbk_trigger(rkisp1);
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -469,6 +661,10 @@ static int rkisp1_csi_set_fmt(struct v4l2_subdev *sd,
+ 
+ 	fmt->format = *sink_fmt;
+ 
++	/* remember the raw frame geometry for the V21 read-back datapath */
++	csi->rkisp1->rdbk_width = sink_fmt->width;
++	csi->rkisp1->rdbk_height = sink_fmt->height;
++
+ 	/* Propagate the format to the source pad. */
+ 	src_fmt = v4l2_subdev_state_get_format(sd_state, RKISP1_CSI_PAD_SRC);
+ 	*src_fmt = *sink_fmt;
+diff --git a/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h b/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
+index 32a8fe8..720ec68 100644
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-regs.h
+@@ -1173,6 +1173,40 @@
+ /* CSI2RX_DATA_IDS_1: data identifier (vc[7:6], dt[5:0]) per virtual id */
+ #define RKISP1_CSI2RX_DATA_IDS_ID0(a)		((a) & 0xff)
+ 
++/*
++ * rk3568 (V21) read-back datapath. The CSI2RX raw-write engine (dmatx0) writes
++ * each received raw frame to DDR; the MI raw-read engine (dmarx0) feeds it back
++ * into the ISP when the read-back is triggered on CTRL0.
++ */
++/* CSI2RX_CTRL0: IBUF op mode 4 = read-back single frame; DMA 2-frame count */
++#define RKISP1_CSI2RX_IBUF_OP_MODE_RDBK1	4
++#define RKISP1_CSI2RX_CTRL0_DMA_2FRM_MODE(a)	(((a) & 0x3) << 12)
++/* CSI2RX raw-write-to-DDR control (dmatx0) */
++#define RKISP1_CSI2RX_RAW0_WR_CTRL		(RKISP1_CIF_MIPI_BASE + 0x00000040)
++#define RKISP1_CSI2RX_RAW0_WR_PIC_SIZE		(RKISP1_CIF_MIPI_BASE + 0x00000048)
++#define RKISP1_CSI2RX_RAW0_WR_PIC_OFF		(RKISP1_CIF_MIPI_BASE + 0x0000004c)
++#define RKISP1_CSI2RX_RAW0_WR_CTRL_EN		BIT(0)
++#define RKISP1_CSI2RX_RAW0_WR_CTRL_CH_EN(a)	(((a) & 0xff) << 8)
++#define RKISP1_CSI2RX_RAW0_WR_CTRL_FORCE_UPD	BIT(31)
++/* CSI2RX raw-read-from-DDR control (dmarx0) */
++#define RKISP1_CSI2RX_RAW_RD_CTRL		(RKISP1_CIF_MIPI_BASE + 0x00000080)
++#define RKISP1_CSI2RX_RAW_RD_PIC_SIZE		(RKISP1_CIF_MIPI_BASE + 0x00000088)
++#define RKISP1_CSI2RX_RAW_RD_CTRL_FORCE_UPD	BIT(31)
++/* CSI2RX status/mask: a full raw frame has been written to DDR */
++#define RKISP1_CSI2RX_STAT_RAW0_WR_FRAME	BIT(0)
++/* MI raw write (dmatx0) and raw read (dmarx0) engines */
++#define RKISP1_CIF_MI_WR_CTRL2			(RKISP1_CIF_MI_BASE + 0x00000400)
++#define RKISP1_CIF_MI_WR_CTRL2_RAW0_AUTOUPD	BIT(0)
++#define RKISP1_CIF_MI_RD_CTRL2			(RKISP1_CIF_MI_BASE + 0x00000408)
++#define RKISP1_CIF_MI_RD_CTRL2_RAW0_AUTOUPD	BIT(30)
++#define RKISP1_CIF_MI_RAW0_WR_BASE		(RKISP1_CIF_MI_BASE + 0x00000420)
++#define RKISP1_CIF_MI_RAW0_WR_SIZE		(RKISP1_CIF_MI_BASE + 0x00000424)
++#define RKISP1_CIF_MI_RAW0_WR_LENGTH		(RKISP1_CIF_MI_BASE + 0x00000428)
++#define RKISP1_CIF_MI_RAW0_WR_BASE_SHD		(RKISP1_CIF_MI_BASE + 0x0000042c)
++#define RKISP1_CIF_MI_RAW0_RD_BASE		(RKISP1_CIF_MI_BASE + 0x00000470)
++#define RKISP1_CIF_MI_RAW0_RD_LENGTH		(RKISP1_CIF_MI_BASE + 0x00000474)
++#define RKISP1_CIF_MI_RAW0_RD_BASE_SHD		(RKISP1_CIF_MI_BASE + 0x00000478)
++
+ #define RKISP1_CIF_ISP_AFM_BASE			0x00002000
+ #define RKISP1_CIF_ISP_AFM_CTRL			(RKISP1_CIF_ISP_AFM_BASE + 0x00000000)
+ #define RKISP1_CIF_ISP_AFM_LT_A			(RKISP1_CIF_ISP_AFM_BASE + 0x00000004)
