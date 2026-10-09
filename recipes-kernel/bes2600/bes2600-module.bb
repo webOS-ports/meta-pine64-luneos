@@ -15,7 +15,7 @@ inherit module
 #
 # The old 0001-Fix-build-with-Linux-6.6.9.patch is gone; bes2600_compat.h replaces it.
 PV = "0.6.9+git"
-SRCREV = "85e6c78de93b7dc9842570caaa33a8f41410e2e1"
+SRCREV = "5831b060690da614d971b5c6a45633a373d21c07"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
