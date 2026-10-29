@@ -51,6 +51,7 @@ SRC_URI = " \
     file://luneos-crypto.cfg \
     file://luneos-squashfs.cfg \
     file://luneos-waydroid-anbox.cfg \
+    file://luneos-yama.cfg \
 "
 
 # do_kernel_configcheck runs symbol_why.py, which parses the tree with the
