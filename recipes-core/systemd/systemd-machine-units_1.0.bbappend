@@ -35,3 +35,16 @@ SYSTEMD_SERVICE:${PN}:pinetab2 = " \
 FILES:${PN}:pinetab2 += " \
     ${systemd_unitdir}/system/scripts \
 "
+
+# PinePhone: no login on the UART unless LUNEOS_DEBUG_ACCESS = "1" (see
+# SERIAL_CONSOLES in pinephone.conf). systemd-getty-generator starts
+# serial-getty@ttyS0 for the console=ttyS0 on the kernel command line whatever
+# SERIAL_CONSOLES says, so mask the instance.
+do_install:append:pinephone() {
+    if [ "${@oe.utils.conditional('LUNEOS_DEBUG_ACCESS', '1', '1', '0', d)}" != "1" ]; then
+        install -d ${D}${sysconfdir}/systemd/system
+        ln -sf /dev/null ${D}${sysconfdir}/systemd/system/serial-getty@ttyS0.service
+    fi
+}
+
+FILES:${PN}:append:pinephone = " ${sysconfdir}/systemd/system/serial-getty@ttyS0.service"
